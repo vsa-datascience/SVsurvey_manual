@@ -228,7 +228,7 @@ De aggregatie wordt gedaan via de scripts in map \url{01_code/02_population_data
 
 
 
-\section{Data verwerking}
+\section{Dataverwerking}
 
 De volgende stap is om voor elke editie de data te verwerken. Dit gebeurt in map \url{01_code/03_process_editions} waarin je een scriptmap vindt per editie en een map voor algemene metadata. De verwerking van de data gebeurt in verschillende stappen.
 
@@ -243,23 +243,162 @@ Op de eerste plaats wordt metadata op een overzichtelijke manier bewaard in data
 
 \item \url{01_code/03_process_editions/Metadata/Mailings.xlsx}: Geeft een overzicht van alle contactpogingen voor elke veldwerkperiode binnen de SV-bevraging.
 
+
+\item \url{01_code/03_process_editions/Metadata/Sports.xlsx}: Bevat de lijst met sporten die worden gecodeerd door Tina. Aan deze lijst kan er niets worden veranderd, behalve sporten worden toegevoegd. Ze koppelt een gestandardiseerde beschrijving aan een nummer.
+
 \item \url{01_code/03_process_editions/Metadata/Questions.xlsx}: Dit bevat een overzicht van alle vragen die worden gesteld in de SV-bevraging. Het koppelt de \verb+ concept_id+'s uit het datamodel aan specifieke vraagverwoordingen. Die vraagverwoording is terug te vinden in de kolommen \verb+question+ en \verb+question_item+. Daarnaast bevat het ook informatie over de vragenlijstmodule waarin de vraag wordt gesteld in kolom \verb+question_module+. Dit bestand kan gebruikt worden om kleine wijzigingen in vraagverwoording te registreren waarbij geen grote resultaatbreuken worden verwacht. Hiervoor maak je gebruik van de kolom \verb+from_surv_id+. In deze kolom staat de versie van de SV-bevraging vanaf wanneer een bepaalde vraagverwoording werd gebruikt. Bijvoorbeeld, in de 11de editie veranderde de vraagverwoording voor de vragen rond sportparticipatie van ``Welke sporten beoefent u momenteel?'' naar ``Welke sporten heeft u de voorbije 12 maanden beoefend?''. Voor elk van deze vragen zal je in de dataset twee rijen vinden, één voor de eerste verwoording vanaf editie SV0001 en één voor de tweede verwoording vanaf editie SV0011. 
 
 Opgelet, bij grote wijzigingen in vraagverwoording waarbij een grote impact wordt verwacht op de resultaten, moet er per definitie een nieuw concept worden gedefinieerd in het datamodel. Er dient ook nog nagekeken te worden of alle wijzigingen in vraagverwoordingen van SV0001 tot SV0015 in dit bestand geregistreerd staan. 
+
+Meer over het gebruik van deze dataset staat in paragraaf \ref{sec:codebook} en \ref{sec:cleaning}. 
 
 \item \url{01_code/03_process_editions/Metadata/Answers.xlsx}: Dit bevat alle antwoordverwoordingen die worden getoond in de vragenlijst van de SV-bevragingen en in principe worden gebruikt als value label in de aangeleverde data. De value label wordt gekoppeld aan de codelijsten via de unieke \verb+value+. Net zoals bij \url{Questions.xlsx} kan deze dataset gebruikt worden om kleine wijzigingen in verwoordingen te documenteren. Dit gebeurt op dezelfde manier als bij de vragen via de kolom \verb+from_surv_id+. Bij de aanmaak van de codeboeken en in de cleaning wordt steeds gekeken naar de meest recente value label door de hoogst mogelijke editie te nemen onder \verb+from_surv_id+ die lager is dan de gevraagde editie.
 
 Opnieuw, bij grote wijzigingen in antwoordverwoording waarbij een grote impact wordt verwacht op de resultaten, moet er per definitie een nieuw concept worden gedefinieerd in het datamodel. Er dient ook nog nagekeken te worden of alle wijzigingen in vraagverwoordingen van SV0001 tot SV0015 in dit bestand geregistreerd staan. 
 
+Meer over het gebruik van deze dataset staat in paragraaf \ref{sec:codebook} en \ref{sec:cleaning}. 
+
+\item \url{01_code/03_process_editions/Metadata/Variables_for_VOS.xlsx}: Deze dataset bevat alle afgeleide variabelen die worden gemaakt voor een tussenliggende analysedataset met het oog op de aanmaak van de openbare statistieken (proporties of gemiddelden). Het gaat voornamelijk over variabelen die worden gedichotomiseerd voor de cijfers op de cijferpagina's (deze eindigen doorgaans op \verb+_dich+), variabelen waarbij de niet-substantiële categorieën worden verwijderd (deze eindigen doorgaans op \verb+_subst+), of variabelen die numeriek worden gemaakt om het gemiddelde te berekenen (deze eindigen doorgaans op \verb+_n+). Meer over het gebruik van deze dataset staat in paragraaf \ref{sec:VOS}. De dataset bestaat uit 
+	\begin{itemize}
+	\item \verb+VOSn+: de numerieke code van de VOS waarvoor de variabele wordt gebruikt (! sommige variabelen worden gebruikt in meerdere VOS'en en komen dus meerdere keren voor in het bestand)
+	\item \verb+VOSname+: de naam van de VOS waarvoor de variabele wordt gebruikt (! sommige variabelen worden gebruikt in meerdere VOS'en en komen dus meerdere keren voor in het bestand)
+	\item \verb+varname+: de variabelenaam
+	\item \verb+varlabel+: de label van de variabele, om over te nemen in opgeleverde datasets, zodat collega's weten wat de variabele inhoudelijk betekent
+	\item \verb+calc_p_value+: Dit was een flag variabele om aan te geven of er voor deze variabele $p$-waarden moesten worden berekend wanneer ze gekruist worden met covariaten. Deze kolom wordt niet meer gebruikt, ik heb deze delen in de scripts uitgecomment. Binnen de VSA werden $p$-waarden op een niet zo koosjere manier gebruikt, namelijk om binair te bepalen of er een samenhang was tussen twee variabelen of niet zonder te kijken naar effectgroottes en inhoudelijke interpretaties. Naast $p$-waarden worden ook betrouwbaarheidsintervallen berekend en weergegeven. Ik adviseer dus om niet te veel aandacht nog te besteden aan $p$-waarden, zolang de statistische expertise van het team niet wordt verhoogd.
+	\item \verb+type+: Deze kolom vertelt welke statistiek moet worden berekend op de variabele:
+		\begin{itemize}
+		\item percentage: een percentage voor dichotome logische variabelen (TRUE/FALSE).
+		\item multinom: alle percentages voor alle categorieën van de variabele.
+		\item mean: het gemiddelde voor numerieke variabelen.
+		\end{itemize}
+	\item \verb+description+: een beschrijving van de statistieken die worden berekend. Eveneens om over te nemen in opgeleverde datasets, zodat collega's weten wat de cijfers in datasets betekenen.
+	\end{itemize}
+De kolomnamen van dit bestand kunnen nog beter. Op langere termijn zou deze dataset volgens mij echter kunnen verdwijnen, meer hierover bij de bespreking van de berekening van de VOS'en in paragraaf \ref{sec:VOS}
+
 \end{itemize}
 
 
+
+
 \subsection{Aanmaak codeboek}
+\label{sec:codebook}
+
+De eerste stap in de verwerking van een SV-bevraging is de aanmaak van het codeboek. Dit codeboek wordt verstuurd naar het veldwerkbureau. Dit zijn de stappen:
+\begin{enumerate}
+\item Als de vraagverwoording en antwoordverwoording worden aangepast ( enkel bij minimale tekstuele wijzigingen, anders moet een nieuw concept worden gedefinieerd), moeten bestanden\\
+	\url{01_code/03_process_editions/Metadata/Questions.xlsx}\\
+	en\\
+	\url{01_code/03_process_editions/Metadata/Answers.xlsx}\\
+	worden bijgewerkt. In principe zouden dit soort wijzigingen maar heel sporadisch mogen gebeuren.
+\item Zorg ervoor dat het bestand\\
+	\url{01_code/03_process_editions/SVXXXX/input/SVXXXX_variables_survey.xlsx}\\
+	klaarstaat. Dit bestand geeft een overzicht van alle variabelen die worden verwacht te worden opgeleverd door het veldwerkbureau en welke naam moet worden gebruikt voor elke variabele (kolom \verb+variable+). De volgorde van deze variabelen is belangrijk, want deze wordt integraal overgenomen in het codeboek. Het bestand geeft ook aan hoe die variabele zal worden omgezet naar een concept (gestandardiseerde variabele) in de gekuiste data (kolom \verb+concept_id+). Voor elke variabele moet er een concept gedefinieerd zijn, anders krijg je foutmeldingen als je de scripts laat lopen.
+\item Maak het script\\
+	\url{01_code/03_process_editions/SVXXXX/01_create_codebook_SVXXXX.R}\\
+	aan (kopieer dit uit een vorige editie en pas de editie aan). In dit script wordt de functie \verb+SVsurvey_create_codebook()+ aangeroepen. Deze functie laadt het bestand\\
+		\url{01_code/03_process_editions/SVXXXX/input/SVXXXX_variables_survey.xlsx}\\
+		in, koppelt dit via \verb+concept_id+ aan de juiste vraagverwoording, variable labels, codelijsten, en antwoordverwoordingen uit de Data Structuur Definitie, \path{Questions.xlsx} en \path{Answers.xlsx}, compileert het codeboek, en schrijft dit weg naar het bestand\\
+		\path{03_deriveddata/04_Codebooks/Codebook_SVXXXX.xlsx}. Klaar!
+\end{enumerate} 
+
+
 
 
 \subsection{Cleaning data}
+\label{sec:cleaning}
+
+Nadat het codeboek is doorgestuurd naar het veldwerkbureau, en dat bureau het veldwerk heeft uitgevoerd en de data heeft opgeleverd, kan de data worden verwerkt. De eerste stap daarin is de validatie en cleaning van de opgeleverde data. Deze stappen neem je daarvoor:
+
+\begin{enumerate}
+
+\item De steekproefdata moet klaar staan in map\\
+	\path{02_sourcedata/SVXXXX/01_sample}
+
+\item Zorg ervoor dat het bestand\\
+	\url{01_code/03_process_editions/SVXXXX/input/SVXXXX_variables_sample.xlsx}\\
+	klaarstaat. Dit bestand geeft een overzicht van alle variabelen die worden gebruikt in de sample data (kolom \verb+variable+) en die worden overgezet naar een gestandardiseerde variabele in de gekuiste data. De variabelenamen in kolom  \verb+variable+ moeten overeenkomen met kolomnamen in de sample data (!hoofdlettergevoelig). Het bestand geeft ook aan hoe die variabele zal worden genoemd in de gekuiste data (kolom \verb+concept_id+). Voor elke gebruikte variabele moet er een concept gedefinieerd zijn, anders krijg je foutmeldingen als je de scripts laat lopen. Variabelen die niet worden gebruikt voor de cleaning moeten niet in dit bestand worden opgenomen.
+
+\item De responsdata moet klaarstaan in map\\
+	\path{02_sourcedata/SVXXXX/02_survey}\\
+	Advies, als er verschillende versie binnenkomen, maak dan submappen aan met de datum als mapnaam in ``YYYYMMDD''
+	
+\item Zorg ervoor dat het bestand\\
+	\url{01_code/03_process_editions/SVXXXX/input/SVXXXX_variables_survey.xlsx}\\
+	klaarstaat. Dit bestand geeft een overzicht van alle variabelen die worden verwacht te worden opgeleverd door het veldwerkbureau en welke naam moet worden gebruikt voor elke variabele (kolom \verb+variable+). De variabelenamen in kolom  \verb+variable+ moeten overeenkomen met kolomnamen in de survey data (!hoofdlettergevoelig). Het bestand geeft ook aan hoe die variabele zal worden omgezet naar een concept (gestandardiseerde variabele) in de gekuiste data (kolom \verb+concept_id+). Voor elke variabele moet er een concept gedefinieerd zijn, anders krijg je foutmeldingen als je de scripts laat lopen. Variabelen die niet worden gebruikt voor de cleaning moeten niet in dit bestand worden opgenomen.
+	
+\item Maak de code\\
+	\path{01_code\03_process_editions\SVXXXX\02_clean_data_SV0001.R}\\
+	om de data manueel te cleanen, en vevolgens structureel. Deze code bevat over het algemeen volgende blokken:
+	\begin{enumerate}
+	\item Inladen en klaarzetten van de steekproefdata. Zorg hierbij ervoor dat
+		\begin{itemize}
+		\item de data nog enkel de variabelen bevatten die worden gebruikt voor de cleaning met de juiste naam (dus de variabelen opgelijst in \path{SVXXXX_variables_sample.xlsx}).
+		\item alle variabelen voldoen aan de evaluatie criteria in de DSD (juiste type [numeriek, character, codebook,\ldots], juiste codebook-waarden hebben, \ldots)
+		\end{itemize}
+	\item Inladen en klaarzetten van de surveydata. Zorg hierbij ervoor dat:
+		\begin{itemize}
+		\item als er met .sav bestanden wordt gewerkt, de variable-labels juist zijn zoals in het codebook. Via de functie \verb+SVsurvey_labelled_2_tibble+ wordt de data automatisch opgeschoond maar worden de variable labels ook nagekeken. Het tweede argument in deze functie laat toe correcte labels te voorzien als een named vector.
+		\item dat correctie op basis van open tekstvakken worden doorgevoerd. Hiervoor zet Tina het bestand\\ \path{01_code\03_process_editions\SVXXXX\input\SV0001_hercodering_obv_tekstvakken.xlsx}\\
+		klaar. Je kan de correcties snel implementeren via de \verb+coalesce_join()+ functie.
+		\item Als de sportvragen aanwezig zijn, dat deze worden gecodeerd. Tina documenteert de hercodering in bestand\\
+		\path{01_code\03_process_editions\SVXXXX\input\SV0014_hercodering_sport.xlsx}\\
+		op basis van\\
+		\path{01_code\03_process_editions\Metadata\Sports.xlsx}.\\
+		Sporten 1 tot 15 worden bevraagd via selectievragen en moeten eventueel worden gecorigeerd op basis van de open antwoordvakken net zoals de andere variabelen in het bestand. Sporten 16-\ldots worden karakteriëel opgeslagen in variabele \verb+spt_othx+, als een semicolon-separated (;) lijst. Zorg hierbij er zeker voor dat de gestandardiseerde sportnamen uit \path{Sports.xlsx} worden gebruikt.
+		\item de data nog enkel de variabelen bevatten die worden gebruikt voor de cleaning met de juiste naam (dus de variabelen opgelijst in 			\path{SVXXXX_variables_sample.xlsx}).
+		\item alle variabelen voldoen aan de evaluatiecriteria in de DSD (juiste type [numeriek, character, codebook,\ldots], juiste codebook-waarden hebben, \ldots)
+		\end{itemize}	
+	\item Laat de \verb+SVsurvey_clean_data()+ lopen op de steekrpoef en survey-data. Deze functie voert alle checks uit op consistenties en zal errors geven als iets niet juist staat. Nadien voert het de gestandardiseerde data-cleaning uit (zoals afgeleide variabelen berekenen, gewichten berekenen, etc.) en schrijft de data weg naar\\
+	\path{03_deriveddata\05_Cleaned_data} als \path{.parquet}-bestanden. 
+	\end{enumerate}
+	Als er iets niet in orde is, zal je foutmeldingen krijgen. 	Wat als je errors krijgt? Dit kan meerdere oorzaken hebben maar ook meerdere oplossingen:
+	\begin{itemize}
+	\item Een waarde in de steekproefdata komt niet voor in een codelijst. Dit kan zowel een fout zijn in het databestand als in de codelijst zelf. Dat laatste zou in principe niet mogen voorkomen, maar de praktijk leert dat bijvoorbeeld de codelijsten met landencodes van Statbel (\verb+cl_countryNIS+) niet compleet zijn (o.a. gebruikt voor geboorteland en nationaliteit). Je kan dan ofwel de steekproef-/survey data aanpassen manueel, of je kan de codelijsten updaten. Dat laatste is uiteraard duurzamer zolang je zeker bent dat de code consistent door Statbel wordt gebruikt. Als je de data zelf corrigeert gebruik dan functies zoals \verb+dplyr::replace_values()+ in een \verb+dplyr::mutate()+ stap.
+	\item Een waarde in de surveydata komt niet voor in een codelijst. Dit kan zowel een fout zijn in het databestand als in de codelijst zelf, maar hier ook in bestand in het bestand \path{Answers.xlsx}. Je kan dezelfde oplossing kiezen als het punt hiervoor, of je kan bestand \path{Answers.xlsx} aanpassen. Pas \path{Answers.xlsx} echter enkel aan als het echt om een gevraagde kleine wijziging in vraagverwoording gaat, want deze wijzigingen zullen meegenomen worden naar de volgende edities. Als het veldwerkbureau gewoon een verkeerde waarde heeft aangeleverd, vervang je dit best manueel via functies zoals \verb+dplyr::replace_values()+ in een \verb+dplyr::mutate()+ stap.
+	\item Variabelenamen zijn fout. Dan heb je opnieuw twee opties. Ofwel verander je de variabelenaam manueel in de code, ofwel corrigeer je de variabelenaam in de bestanden \path{SVXXXX_variables_sample.xlsx} of \path{SVXXXX_variables_survey.xlsx}. Die laatste optie is natuurlijk veel eleganter.
+	\end{itemize}
+	
+\end{enumerate}
 
 
+
+
+
+\subsection{Aanmaak VOS'en}
+\label{sec:VOS}
+
+
+
+
+\subsection{Creatie Public en Scientific Use Files}
+
+
+
+
+
+
+\section{Klaarzetten tabellen cijferpagina's}
+
+
+
+
+
+
+\section{Nieuwe vragen}
+
+Wat moet er gebeuren als er nieuwe vragen worden toegevoegd aan de SV-bevraging
+
+\begin{enumerate}
+\item codelijst aanmaken
+\item concept toevoegen aan dsd
+\item vraagverwoording toevoagen aan Questions.xlsx
+\item antwoordverwoording toevoegen aan Answers.xlsx
+\item variabele mee opnemen in cleaning, ze moet dus ook staan in het overzicht \path{SVXXXX_variables_survey.xlsx}
+\item Als er speciale bewerkingen tijdens de cleaning moeten worden uitgevoerd, moet dit opgenomen worden in \path{SVsurvey_clean_data.R}
+\item analyse van de variable moet worden toegevoegd aan de \path{SVsurvey_create_VOS.R}
+\item Voeg de variabele toe aan bestand \path{} voor PUF en SUF
+\item de aanmaak van een tabel voor DataWrapper moet worden toegevoegd 
+\end{enumerate}
 
 
 
