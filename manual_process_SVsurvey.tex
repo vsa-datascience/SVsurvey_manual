@@ -357,7 +357,6 @@ Nadat het codeboek is doorgestuurd naar het veldwerkbureau, en dat bureau het ve
 	\item Een waarde in de surveydata komt niet voor in een codelijst. Dit kan zowel een fout zijn in het databestand als in de codelijst zelf, maar hier ook in bestand in het bestand \path{Answers.xlsx}. Je kan dezelfde oplossing kiezen als het punt hiervoor, of je kan bestand \path{Answers.xlsx} aanpassen. Pas \path{Answers.xlsx} echter enkel aan als het echt om een gevraagde kleine wijziging in vraagverwoording gaat, want deze wijzigingen zullen meegenomen worden naar de volgende edities. Als het veldwerkbureau gewoon een verkeerde waarde heeft aangeleverd, vervang je dit best manueel via functies zoals \verb+dplyr::replace_values()+ in een \verb+dplyr::mutate()+ stap.
 	\item Variabelenamen zijn fout. Dan heb je opnieuw twee opties. Ofwel verander je de variabelenaam manueel in de code, ofwel corrigeer je de variabelenaam in de bestanden \path{SVXXXX_variables_sample.xlsx} of \path{SVXXXX_variables_survey.xlsx}. Die laatste optie is natuurlijk veel eleganter.
 	\end{itemize}
-	
 \end{enumerate}
 
 
@@ -367,6 +366,33 @@ Nadat het codeboek is doorgestuurd naar het veldwerkbureau, en dat bureau het ve
 \subsection{Aanmaak VOS'en}
 \label{sec:VOS}
 
+De volgende stap is de aanmaak van de Openbare statistieken. Dit zijn alle statistieken die worden gepubliceerd op de cijferpagina's en in de cijferapplicatie (PowerBI). Maak hiervoor het script\\
+\path{01_code\03_process_editions\SVXXXX\03_create_VOS_SVXXXX.R}\\
+aan. Deze roept de functie \verb+SVsurvey_create_VOS()+ aan, waarna een analysedataset wordt weggeschreven in\\
+\path{03_deriveddata\06_Analysis_data}\\
+en data met alle VOS'en in\\
+\path{\\WV162699\fs_kb_dkb\svr\Beveiligde_data_VSA\999_Public_Use_Files\01_VOSdata\SVsurvey}
+
+De functie \verb+SVsurvey_create_VOS()+ is heel ad-hoc opgesteld en kan nog sterk verbeterd en vereenvoudigd worden. De reden hiervoor is dat de vragen voor analyse heel gefragmenteerd binnenkwamen en er ook nog geen visie is over wat nu de officiële statistieken zijn. Op de cijferpagina's worden cumulatieve proporties getoond voor één categorie per variabele, in de cijferapplicatie werd dit plots veranderd naar de proporties per categorie. In de code zal je daarom zien dat ik eerst een analysedataset maak waarbij ik variabelen klaarzet voor verwerking, zoals dichotomiseren of verwijderen van niet-substantiële waarden. Die analysedataset wordt ook weggeschreven naar\\
+\path{\\WV162699\fs_kb_dkb\svr\Beveiligde_data_VSA\021_SVbevraging\03_deriveddata\06_Analysis_data}\\
+Alle analysevariabelen worden ook opgelijst in\\
+\path{01_code\03_process_editions\Metadata\Variables_for_VOS.xlsx}\\
+Na de aanmaak van de analyse dataset worden drie functies (om gemiddelden, proporites en multinomiale proporties te berekenen) iteratief gemapt op de variabelen volgens kolom 
+\verb+type+ in \path{Variables_for_VOS.xlsx}. Dit zijn de VOS'en en worden weggeschreven in\\
+\path{\\WV162699\fs_kb_dkb\svr\Beveiligde_data_VSA\999_Public_Use_Files\01_VOSdata\SVsurvey\VOS}.
+Bovendien worden ook item- en unitnonresponsgraden berekend voor gebruik op de cijferpagina's. Deze worden weggeschreven naar\\
+\path{\\WV162699\fs_kb_dkb\svr\Beveiligde_data_VSA\999_Public_Use_Files\01_VOSdata\SVsurvey\respons_rates}
+
+Wat kan beter?
+\begin{enumerate}
+\item De officiële statistieken zouden gedefinieerd kunnen worden als alle cumulatieve proporties over de antwoorschalen. punt. De cijferpagina's tonen dan slechts de cumulatieve proportie voor één categorie maar de cijferapplicatie toont ze voor alle categorieën. 
+\item De mapping naar variabelen naar analysevariabelen kan gebeuren via de mappings in de codelijsten in \path{03_deriveddata\01_codelists}. Het is waarschijnlijk niet nuttig om een aparte dataset aan te maken.
+\item de output tabellen met de VOS'en zijn nog niet gekoppeld aan het datamodel. De namen van de kolommen in de tabellen zijn ook nog te willekeurig, hoewel ik ze nu al wat consistenter heb gemaakt.
+\end{enumerate}
+
+Opgelet! De data in\\
+\path{\\WV162699\fs_kb_dkb\svr\Beveiligde_data_VSA\999_Public_Use_Files\01_VOSdata\SVsurvey\VOS}\\
+is de bron van de PowerBI app, de variabelenamen zijn echter wel veranderd. Dus dit moet aangepast worden in PowerBI.
 
 
 
@@ -379,8 +405,11 @@ Nadat het codeboek is doorgestuurd naar het veldwerkbureau, en dat bureau het ve
 
 \section{Klaarzetten tabellen cijferpagina's}
 
+Als de VOS-data klaar staan, kan hieruit een extractie gebeuren om datasets aan te maken voor de cijferpagina's. Dit gebeurt via het programma
 
 
+Deze tabellen worden weggeschreven in de map\\
+\path{\\WV162699\fs_kb_dkb\svr\Beveiligde_data_VSA\999_Public_Use_Files\02_CPdata}
 
 
 
@@ -389,7 +418,7 @@ Nadat het codeboek is doorgestuurd naar het veldwerkbureau, en dat bureau het ve
 Wat moet er gebeuren als er nieuwe vragen worden toegevoegd aan de SV-bevraging
 
 \begin{enumerate}
-\item codelijst aanmaken
+\item codelijst aanmaken in het datamodel
 \item concept toevoegen aan dsd
 \item vraagverwoording toevoagen aan Questions.xlsx
 \item antwoordverwoording toevoegen aan Answers.xlsx
