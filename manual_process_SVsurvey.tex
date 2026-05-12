@@ -1,6 +1,1127 @@
 \documentclass{VSAnote}
 
+\usepackage{ulem}
+\hypersetup{
+    hidelinks=false,
+    colorlinks=false,
+    urlbordercolor=lightskyblue,
+    linkbordercolor=lightskyblue,
+    pdfborderstyle={/S /U /W 1},
+}
 
+\begin{document}
+
+\title{Handleiding productie SV-bevraging}
+\author{Jorre Vannieuwenhuyze}
+\titlepage
+
+\tableofcontents
+
+
+
+De cleaning van de SV-bevragingen is work-in-progress. De ideeën en de opzet die ik hieronder voorstek zijn nog steeds slechts een aanzet om de zaken efficiënter maar vooral consistenter en minder fout-gevoelig te publiceren. De SV-bevragingen kunnen daarbij gebruikt worden als voorbeeld voor andere dataverwerkingsprocessen. Zo'n proces opzetten is sowieso een proces van trial and error, uittesten wat goed werkt en wat niet, steeds kijken welke mankementen nog niet zijn opgelost, en op die manier te evolueren naar een werkbare aanpak. 
+
+
+\section{Praktische informatie}
+
+\begin{itemize}
+
+\item Alle bestanden bevinden zich in de map
+\begin{quote}
+\url{//WV162699/fs_kb_dkb/svr/Beveiligde_data_VSA/021_SVbevraging}
+\end{quote}
+Deze map is onderverdeeld in drie submappen:
+
+\begin{itemize}
+
+\item \url{01_code}: bevat alle verwerkingscode voor de SV-bevraging. Deze map kan gesynchroniseerd worden met GitHub.
+
+\textit{Opmerking 1:} naast scripts bevat deze map ook enkele datasets die manueel worden aangemaakt om het productieproces overzichtelijk te houden. Deze werkwijze is momenteel nog niet standaard binnen de VSA.
+
+\textit{Opmerking 2:} de code omvat ook processtappen die idealiter door aparte, gespecialiseerde teams worden beheerd. Het gaat daarbij onder meer om de ontwikkeling van algemene programmeerfuncties, het beheer van het datamodel en de aggregatie van demografische gegevens voor de berekening van de gewichten.
+
+\item \url{02_sourcedata}: opslagplaats voor alle aangeleverde ruwe datasets, georganiseerd per editie (\url{SV0001}, \url{SV0002}, \url{SV0003}, \ldots). Elke editie bevat twee submappen:
+\begin{itemize}[nosep]
+\item \url{01_sample}: steekproefdata van Statbel
+\item \url{02_survey}: enquêtedata van de veldwerkbureaus
+\end{itemize}
+
+Wanneer er meerdere leveringen binnen één editie zijn, wordt aanbevolen om deze verder op te delen in mappen per aanleverdatum met mapnaam in het formaat \texttt{YYYYMMDD}.
+
+Daarnaast bevat deze map ook de submap \url{Demobel-stock}, met bevolkingsdata die gebruikt wordt voor de berekening van populatiestatistieken en weegfactoren. Op termijn hoort deze data structureel thuis in:
+\begin{quote}
+\url{//WV162699/fs_kb_dkb/svr/Beveiligde_data_VSA/011_Demografie}
+\end{quote}
+waardoor de map \url{Demobel-stock} overbodig wordt.
+
+\item \url{03_deriveddata}: bevat alle tussentijdse en afgeleide bestanden die uitsluitend intern worden gebruikt tijdens de verwerking.
+
+\end{itemize}
+
+\item Gedeelde data wordt weggeschreven naar twee afzonderlijke mappen:
+\begin{itemize}[nosep]
+\item \url{//WV162699/fs_kb_dkb/svr/Beveiligde_data_VSA/998_Scientific_Use_Files}\\
+Bestanden voor intern gebruik binnen de VSA. Deze zijn toegankelijk voor alle VSA-medewerkers, maar niet bedoeld voor externe publicatie. Voorbeelden zijn de Scientific Use Files (SUF's).
+
+\item \url{//WV162699/fs_kb_dkb/svr/Beveiligde_data_VSA/999_Public_Use_Files}\\
+Bestanden die publiek mogen worden gepubliceerd en ook extern toegankelijk zijn. Hieronder vallen onder meer de Public Use Files (PUF's) en de bestanden met de officiële Vlaamse openbare statistieken (VOS).
+\end{itemize}
+
+\item Mappen, variabelen, codelijsten en andere technische objecten worden standaard in het Engels benoemd. Dit verhoogt de consistentie en bevordert hergebruik en duurzaamheid.
+
+\item De meeste databestanden worden momenteel opgeslagen in \texttt{.xlsx}-formaat. Dat is binnen de VSA het meest toegankelijke formaat voor inspectie en manuele aanpassingen, maar het is niet de meest efficiënte keuze. Formaten zoals \texttt{.csv}, \texttt{.parquet} of \texttt{.json} zijn performanter en robuuster en kunnen op termijn worden overwogen.
+
+\item Alle scripts zijn geschreven in \texttt{R}. Indien nodig kunnen deze in principe relatief eenvoudig worden omgezet naar Python.
+
+\item De map \url{01_code/00_functions} bevat een verzameling functies volgens de structuur van een \texttt{R}-package. De functies bevinden zich in de submap \url{R} en zijn gedocumenteerd via Roxygen2 in de code zelf.
+
+\end{itemize}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\section{Datamodel}
+
+De eerste stap in het verwerkingsproces is de opzet van een datamodel. Daarbij worden eerst codelijsten gedefinieerd, waarna data structure definitions (DSD's) worden opgesteld voor de Internal, Scientific en Public Use Files. In deze DSD's wordt een overzicht gegeven van de kolommen of variabelen, en worden codelijsten aan deze kolommen gekoppeld indien relevant. Deze opzet sluit aan bij de principes van SDMX.
+
+Het datamodel wordt opgebouwd in de map \url{01_code/01_data_model}. Afgeleide codelijsten en data structure definitions worden weggeschreven naar \url{03_deriveddata/01_codelists} en \url{03_deriveddata/02_DSD}. Op langere termijn wordt het beheer van het datamodel idealiter gecentraliseerd bij een dedicated datamodelteam dat werkt in:
+\begin{quote}
+\url{//WV162699/fs_kb_dkb/svr/Beveiligde_data_VSA/002_DataModel}
+\end{quote}
+
+In principe hoeft het datamodel enkel te worden aangepast wanneer:
+\begin{itemize}[nosep]
+\item een nieuwe vraag of antwoordcategorie wordt toegevoegd aan de SV-bevraging;
+\item een bestaande definitie of codering wordt gecorrigeerd;
+\item bijkomende validatieregels nodig zijn voor de verwerking.
+\end{itemize}
+
+\subsection{Codelijsten}
+\label{sec:codelijsten}
+
+De map \url{01_data_model/01_code_lists} bevat de scripts en invoerbestanden voor de aanmaak van de codelijsten. Deze codelijsten kunnen worden onderverdeeld in algemene codelijsten en codelijsten met een meer specifieke verwerking.
+
+\subsubsection{Algemene codelijsten}
+
+De map \url{01_general_codelists} bevat algemene codelijsten die geen specifieke behandeling vragen. De opzet ervan vraagt wel enige toelichting, omdat veel codelijsten inhoudelijk met elkaar samenhangen.
+
+Een eerste voorbeeld is dat verschillende vragen in de SV-bevraging dezelfde niet-substantiële antwoordcategorieën gebruiken, zoals ``Niet van toepassing'' of ``Ik weet het niet / geen antwoord''. Om consistentie te garanderen, worden deze categorieën centraal beheerd zodat hun labels overal identiek blijven.
+
+Een tweede voorbeeld is dat sommige codelijsten een subset vormen van andere codelijsten. Zo kan een codelijst met de categorieën ``man'' en ``vrouw'' een subset zijn van een ruimere codelijst voor geslacht zoals die in de vragenlijst wordt gebruikt, bijvoorbeeld met categorieën ``man'', ``vrouw'' en ``X''. Ook in dat soort gevallen is centrale afstemming wenselijk om inconsistenties te vermijden.
+
+De algemene codelijsten worden opgebouwd op basis van twee invoerbestanden:
+
+\begin{itemize}
+
+\item \url{input/code_list_values.xlsx}: bevat een overzicht van alle mogelijke waarden die op codelijsten kunnen voorkomen. Dit bestand bevat onder meer:
+\begin{itemize}
+\item \verb+value+: een gestandaardiseerde code die wordt gebruikt in datasets en scripts;
+\item \verb+description_nl+: een inhoudelijke beschrijving van de waarde in het Nederlands, louter bedoeld als naslag;
+\item \verb+label_nl+, \verb+label_fr+, \verb+label_en+, \ldots: labels in verschillende talen die gebruikt worden in output zoals public use files en gepubliceerde tabellen.
+\end{itemize}
+
+Door deze labels centraal te beheren, kunnen wijzigingen eenvoudig en consistent worden doorgevoerd. Conceptueel sluit dit bestand aan bij het idee van een conceptenlijst voor codelijstwaarden.
+
+\item \url{input/code_list_skeletons.xlsx}: bevat de structuur van de codelijsten. Elk tabblad beschrijft een reeks codelijsten die inhoudelijk samenhangen of subsets van elkaar vormen. Dit bestand bevat kolommen:
+\begin{itemize}
+\item \verb+value+: sleutel die verwijst naar \url{code_list_values.xlsx};
+\item \verb+valuen+: numerieke code die een consistente ordening van categorieën mogelijk maakt;
+\item één of meerdere kolommen met aan te maken codelijsten. De kolomnaam is de naam van de codelijst. Waarden \verb+TRUE+ geven aan dat een waarde moet worden opgenomen in de codelijst; \verb+FALSE+ betekent dat de waarde niet wordt opgenomen.
+\end{itemize}
+
+\end{itemize}
+
+Het script \url{create_general_code_lists.R} combineert beide bestanden en schrijft de codelijsten weg naar \url{03_deriveddata/01_codelists}. Daar wordt elke codelijst als een afzonderlijk \texttt{.parquet}-bestand (voor verder gebruikt) en \texttt{.xlsx}-bestand (als naslagwerk) bewaard.
+
+Elke codelijst bevat minstens:
+\begin{itemize}
+\item \verb+value+ en eventueel \verb+valuen+;
+\item labels in verschillende talen;
+\item indien relevant: mappings naar bredere of beperktere codelijsten die als subsetrelaties kunnen worden gebruikt tijdens de dataverwerking.
+\end{itemize}
+
+Die mappings maken het bijvoorbeeld mogelijk om variabelen met niet-substantiële categorieën op een consistente manier om te zetten naar een versie zonder zulke niet-substantiële categorieën.
+
+\subsubsection{Specifiekere codelijsten}
+
+Naast de algemene codelijsten bevat het datamodel ook een aantal codelijsten met een specifiekere verwerking.
+
+\paragraph{NIS-codes}
+
+Het script \url{02_NIS_codes/create_code_lists_NIScodes.R} maakt codelijsten aan voor NIS-codes van gewesten, provincies, arrondissementen, gemeenten en deelgemeenten. Hiervoor worden de Statbel-bestanden gebruikt die kunnen worden gedownload via:
+\begin{quote}
+\url{https://statbel.fgov.be/nl/over-statbel/methodologie/classificaties/geografie}
+\end{quote}
+De bronbestanden worden bewaard in \url{02_NIS_codes/input}.
+
+Er worden versies aangemaakt voor de jaren 1983, 1995, 2019 en 2025, omdat in die jaren wijzigingen in de NIS-codering werden doorgevoerd. Voor elke versie worden codelijsten gemaakt op verschillende niveaus:
+\begin{itemize}[nosep]
+\item 0 = het rijk
+\item 1 = gewesten
+\item 2 = provincies
+\item 3 = arrondissementen
+\item 4 = gemeenten
+\item 5 = deelgemeenten
+\end{itemize}
+
+In de map \url{03_deriveddata/01_codelists} vind je deze bestanden terug als \verb+cl_refnisVERSIONlvlNIVEAU.xlsx+. Daarnaast wordt per versie ook een algemene codelijst aangemaakt, \verb+cl_refnisVERSION.xlsx+, waarin de verschillende niveaus gecombineerd worden.
+
+Deze codelijsten bevatten ook mappings tussen niveaus en versies, zodat bijvoorbeeld gemeenten kunnen worden gekoppeld aan provincies of oudere coderingen aan nieuwere.
+
+\paragraph{Landencodes}
+
+Landen worden op verschillende manieren gecodeerd en gegroepeerd. Het script \url{03_country_codes/create_code_lists_countries.R} maakt hiervoor codelijsten aan. Het gaat onder meer om:
+\begin{itemize}[nosep]
+\item ISO2-codes;
+\item ISO3-codes;
+\item NIS-landencodes;
+\item indelingen naar landengroepen.
+\end{itemize}
+
+
+\subsubsection{Verdere opmerkingen}
+
+\paragraph{Andere codelijsten}
+
+Voor de NIS-codes en landencodes maken de scripts heel wat codelijsten aan die niet worden gebruikt voor de verwerking van de SV-bevraging. De SV-bevraging heeft enkel NIS-codes op gemeenteniveau nodig die enkel naar provincieniveau worden omgezet. Voor landencodes wordt binnen de SV-bevraging enkel de NIS-landencodes gebruikt.
+
+Waarom maken de scripts dan ook andere codelijsten aan? Een deel van deze scripts werd oorspronkelijk ontwikkeld in het kader van een breder transitietraject binnen de VSA. Andere dataverwerkingsprocessen kunnen gebruik maken van die andere codelijsten. Bovendien zijn er ook al scripts beschikbaar die momenteel niet rechtstreeks worden gebruikt voor de SV-bevraging, maar later nuttig kunnen zijn voor andere dataverwerkingsprocessen. Deze bevinden zich in:
+\begin{quote}
+\url{//WV162699/fs_kb_dkb/svr/Beveiligde_data_VSA/002_DataModel/00_Code}
+\end{quote}
+
+Het gaat onder meer om voorbereidende scripts voor codelijsten van:
+\begin{itemize}[nosep]
+\item statistische sectoren;
+\item tijdsvariabelen;
+\item postcodes;
+\item andere variabelen uit de Demobel-stand van de bevolking.
+\end{itemize}
+
+
+\paragraph{Clean run}
+
+Het script \url{create_code_lists.R} maakt alle codelijsten in \url{03_deriveddata/01_codelists} opnieuw aan vanaf een lege toestand. Het script bevat zelf geen logica om codelijsten op te bouwen, maar roept de onderliggende scripts in de submappen aan. Vooraf wordt de doelmap verwijderd en opnieuw aangemaakt. Hierdoor vermijd je dat verouderde bestanden blijven staan en voer je een clean run uit.
+
+
+\paragraph{Wat kan nog beter?}
+
+De scripts kunnen nog verder worden uitgebreid met bijkomende kwaliteitscontroles, bijvoorbeeld:
+\begin{itemize}[nosep]
+\item controle op unieke namen van codelijsten;
+\item controle op verplichte kolommen zoals \verb+value+ en \verb+label_nl+;
+\item controle op unieke \verb+value+ en \verb+valuen+ binnen een codelijst;
+\item controle op consistente mappings tussen gerelateerde codelijsten;
+\item de aanmaal van de algemene codelijsten kan waarschijnlijk nog efficiënter. Wanneer dit wordt uitgebreid naar andere dataprocessen binnen de VSA, lijkt het ook overzichtelijker wanneer deze thematisch worden beheerd.
+\end{itemize}
+
+
+
+
+
+\subsection{Data structure definitions}
+
+Nadat de codelijsten zijn aangemaakt, kan de data structure definition (DSD) worden opgesteld. In de DSD wordt vastgelegd:
+\begin{itemize}[nosep]
+\item welke variabelen kunnen voorkomen in een dataset;
+\item welk type deze variabelen hebben;
+\item welke validatieregels erop van toepassing zijn;
+\item en, indien relevant, aan welke codelijst zij gekoppeld zijn.
+\end{itemize}
+
+Binnen het datamodel worden variabelen beschouwd als concepten in de zin van SDMX. De DSD vormt daarmee de inhoudelijke en technische basis voor de verdere dataverwerking en voor de sterschema's in de database.
+
+De aanpak voor de creatie van een DSD bestaat uit twee stappen:
+\begin{enumerate}
+\item eerst wordt één centrale DSD opgesteld met alle mogelijke variabelen en hun algemene criteria;
+\item vervolgens worden voor specifieke outputbestanden enkel de relevante concepten geselecteerd en eventueel verder verfijnd.
+\end{enumerate}
+
+De aanmaak van de algemene DSD start vanuit het bestand:
+\begin{quote}
+\url{01_code/01_data_model/02_DSD/dsd_variables.xlsx}
+\end{quote}
+
+Dit bestand bevat een overzicht van alle mogelijke variabelen en bevat onder meer volgende kolommen:
+\begin{itemize}[nosep]
+\item \verb+concept_id+: unieke identificatienaam van de variabele;
+\item \verb+description_nl+: inhoudelijke beschrijving in het Nederlands. Deze wordt verder niet gebruikt en kan dus heel flexibel worden gebruikt als naslagwerk;
+\item \verb+label_nl+, \verb+label_fr+, \verb+label_en+: korte labels in verschillende talen die worden overgenomen in data-ontsluiting;
+\item \verb+constraint_type+: opslagformaat of datatype, met mogelijke waarden \texttt{character}, \texttt{codelist}, \texttt{integer}, \texttt{numeric}, \texttt{date} of \texttt{datetime};
+\item \verb+constraint_codelist+: verwijzing naar de gebruikte codelijst, indien van toepassing;
+\item \verb+constraint_regex+: reguliere expressie waaraan karakteriële waarden moeten voldoen;
+\item \verb+constraint_min+: minimale toegelaten waarde voor numerieke variabelen;
+\item \verb+constraint_max+: maximale toegelaten waarde voor numerieke variabelen;
+\item \verb+constraint_allow_missings+: logische indicator die aangeeft of missende waarden toegelaten zijn;
+\end{itemize}
+
+Het script \url{01_code/01_data_model/02_DSD/check_and_publish_dsd.R} kopieert \url{dsd_variables.xlsx} naar \url{03_deriveddata/02_DSD} als \texttt{.parquet}-bestand (voor verder gebruik) en \texttt{.xlsx}-bestand (als naslagwerk), maar voert eerst verschillende controles uit. Voorbeelden zijn:
+\begin{itemize}[nosep]
+\item controle op unieke \texttt{concept\_id}'s;
+\item controle of gebruikte codelijsten effectief bestaan in \url{03_deriveddata/01_codelists};
+\item controle of regular expressions geldig zijn;
+\item controle of \texttt{min} en \texttt{max} logisch zijn ingevuld;
+\item controle op consistentie tussen datatype en validatieregels.
+\end{itemize}
+
+Het gepubliceerde bestand \url{03_deriveddata/02_DSD/dsd.xlsx} is vervolgens de formele basis voor de verdere dataverwerking. De centrale DSD bevat algemene definities en validatieregels. Belangrijk is dat:
+\begin{itemize}[nosep]
+\item de centrale DSD steeds de referentie blijft;
+\item afwijkingen of verfijningen expliciet worden gedocumenteerd in code of metadata;
+\item nieuwe concepten of structurele wijzigingen zoveel mogelijk eerst in het datamodel worden opgenomen, en niet ad hoc in een afzonderlijk script.
+\end{itemize}
+
+
+
+\paragraph{Wat kan beter?}
+
+\begin{itemize}
+
+\item Er kan een bijkomende constraint \verb+complete+ worden toegevoegd, een indicator die aangeeft of in een dataset alle mogelijke waarden verwacht worden voor deze variabele. Dit is vooral relevant voor tabellen waarin de volledige combinatie van categorieën aanwezig moet zijn. Bijvoorbeeld: als voor elke gemeente een waarde moet voorkomen, moet \texttt{complete = TRUE} staan voor de betrokken gemeentecodevariabele.
+
+\item Mijn idee was dat analysten tijdens verdere verwerking de regels uit de DSD verder kunnen verfijnen voor een specifieke outputdataset, zolang dit gebeurt op een consistente en gedocumenteerde manier. Zo kan een variabele in de centrale DSD breder gedefinieerd zijn dan in een specifieke public use file of analysetabel. Zo kan de algemene DSD opleggen dat de minimumwaarde voor geboortejaar 1900 is maar kan dit verder worden aangepast naar bijvoorbeeld 1920, zolang de nieuwe minimumwaarde maar groter is dan de algemene minimumwaarde.
+
+\item Op langere termijn kan het datamodel nog verder worden uitgebouwd door:
+\begin{itemize}[nosep]
+\item conceptenlijsten voor variabelen en codelijst- waarden nauwer op elkaar af te stemmen. Als je een tabel pivoteert worden variabelen immers waarden op één variabele of vice versa;
+\item outputtabellen ook formeel te koppelen aan het datamodel;
+\item validatieregels verder te standaardiseren over verwerkingsprocessen heen.
+\end{itemize}
+
+\end{itemize}
+
+
+
+
+
+
+
+
+
+
+\section{Populatie-informatie}
+
+De tweede stap in het verwerkingsproces is de aggregatie van bevolkingsstatistieken voor de berekening van de poststratificatiegewichten in de SV-bevraging. Hiervoor wordt gebruikgemaakt van stockbevolkingsdata.
+
+De aggregatie gebeurt per jaar en niet per editie van de SV-bevraging, omdat de bevolkingsdata ook per jaar wordt aangeleverd. Daarom vormt dit een afzonderlijke stap in het proces.
+
+De brondata wordt bewaard in:
+\begin{quote}
+\url{021_SVbevraging/02_sourcedata/Demobel-stock}
+\end{quote}
+Steeds in \texttt{.sav}-formaat. Vraag deze databestanden bij voorkeur op bij de demografen. Gebruik daarbij consequent de bestandsnaam \verb+stock_YYYY.sav+, omdat de scripts deze bestanden automatisch ophalen. Bij afwijkende bestandsnamen zullen de scripts niet correct werken en een foutmelding geven.
+
+De aggregatie gebeurt via de scripts in de map \url{01_code/02_population_data}. Er is doorgaans één script per jaar, maar deze scripts roepen telkens enkel de functie \verb+SVsurvey_aggregate_population()+ aan uit \url{01_code/00_functions/R}. Die functie schrijft de geaggregeerde cijfers automatisch weg naar:
+\begin{quote}
+\url{03_deriveddata/03_aggregated_population_data}
+\end{quote}
+
+\paragraph{Wat kan beter?}
+
+Inhoudelijk is dit in feite een proces dat idealiter structureel zou worden opgenomen binnen de demografische dataprocessen, bijvoorbeeld door de demografen of de data engineers die verantwoordelijk zijn voor de verwerking in:
+\begin{quote}
+\url{//WV162699/fs_kb_dkb/svr/Beveiligde_data_VSA/011_Demografie}
+\end{quote}
+In dat geval zouden de scripts voor de SV-bevraging de geaggregeerde data daar rechtstreeks kunnen ophalen. Zo wordt dubbele databewaring en -verwerking vermeden.
+
+
+
+
+
+
+
+
+
+
+
+
+
+\section{Dataverwerking voor de SV-bevraging}
+
+De volgende stap is de verwerking van de data per editie van de SV-bevraging. Deze verwerking gebeurt in de map \url{01_code/03_process_editions}. Daarin vind je een scriptmap per editie, aangevuld met een map voor algemene metadata.
+
+
+
+\subsection{Editie-specifieke verwerking}
+
+De verwerking van een editie bestaat uit verschillende opeenvolgende stappen:
+\begin{enumerate}[nosep]
+\item metadata beheren;
+\item codeboek aanmaken;
+\item ruwe data valideren en cleanen;
+\item analysedata en VOS'en aanmaken.
+\end{enumerate}
+
+
+\subsubsection{Metadata}
+
+Metadata wordt zo veel mogelijk overzichtelijk bewaard in databestanden en niet in programmascripts. Die bestanden moeten actief worden aangevuld bij elke editie. Als noodzakelijke informatie ontbreekt, geven de scripts foutmeldingen zodat duidelijk is wat nog moet worden ingevuld.
+
+De belangrijkste metadata-bestanden zijn:
+
+\begin{itemize}
+
+\item \url{01_code/03_process_editions/Metadata/Editions.xlsx}\\
+Bevat een overzicht van de verschillende edities van de SV-bevraging.
+
+\item \url{01_code/03_process_editions/Metadata/Mailings.xlsx}\\
+Bevat een overzicht van alle contactpogingen per veldwerkperiode binnen de SV-bevraging.
+
+\item \url{01_code/03_process_editions/Metadata/Sports.xlsx}\\
+Bevat de lijst met sporten die gecodeerd worden door Tina. Aan deze lijst mogen in principe enkel nieuwe sporten worden toegevoegd. Er mag niets worden verwijderd. Het bestand koppelt een gestandaardiseerde beschrijving aan een numerieke code.
+
+\item \url{01_code/03_process_editions/Metadata/Questions.xlsx}\\
+Bevat een overzicht van alle vragen in de SV-bevraging. Dit bestand koppelt de \verb+concept_id+'s uit het datamodel aan concrete vraagverwoordingen. De vraagverwoording is terug te vinden in de kolommen \verb+question+ en \verb+question_item+. Daarnaast bevat het bestand ook informatie over de vragenlijstmodule in kolom \verb+question_module+.
+
+Dit bestand kan worden gebruikt om beperkte tekstuele wijzigingen in vraagverwoordingen te registreren, voor zover daarbij geen belangrijke resultaatbreuk wordt verwacht. Daarvoor wordt de kolom \verb+from_surv_id+ gebruikt. Deze kolom geeft aan vanaf welke editie een bepaalde formulering wordt gebruikt.
+
+Bijvoorbeeld: als in een latere editie de formulering van een bestaande vraag beperkt wijzigt, kunnen beide versies in \url{Questions.xlsx} worden opgenomen, elk met hun eigen starteditie (\verb+from_surv_id+). Tijdens de verwerking wordt dan automatisch de relevante versie gekozen.
+
+\textbf{Belangrijk:} wanneer een wijziging in vraagverwoording inhoudelijk te groot genoeg is eb een breuk in de resultaten kan veroorzaken, moet in principe een nieuw concept worden gedefinieerd in het datamodel in plaats van een loutere wijziging in vraagverwoording.
+
+Meer over het gebruik van dit bestand staat in paragraaf \ref{sec:codebook} en \ref{sec:cleaning}.
+
+\item \url{01_code/03_process_editions/Metadata/Answers.xlsx}\\
+Bevat alle antwoordverwoordingen die in de vragenlijst worden getoond en die in principe ook als value labels in de aangeleverde data voorkomen. De value label wordt gekoppeld aan de codelijsten via de unieke \verb+value+.
+
+Net zoals \url{Questions.xlsx} kan dit bestand worden gebruikt om beperkte tekstuele wijzigingen in antwoordverwoordingen te documenteren. Ook hier gebeurt dat via de kolom \verb+from_surv_id+.
+
+Bij de aanmaak van codeboeken en tijdens de cleaning wordt steeds de meest recente geldige antwoordverwoording gekozen, namelijk de versie met de hoogste \verb+from_surv_id+ die niet hoger is dan de editie die verwerkt wordt.
+
+Ook hier geldt: bij een inhoudelijk belangrijke wijziging in de antwoordcategorieën of betekenis van de categorieën moet een nieuw concept of een nieuwe codelijst worden gedefinieerd in het datamodel.
+
+Meer over het gebruik van dit bestand staat in paragraaf \ref{sec:codebook} en \ref{sec:cleaning}.
+
+\item \url{01_code/03_process_editions/Metadata/Variables_for_VOS.xlsx}\\
+Dit bestand bevat alle afgeleide variabelen die worden gebruikt in een tussentijdse analysedataset met het oog op de aanmaak van de openbare statistieken. Het gaat vooral om:
+\begin{itemize}
+\item gedichotomiseerde variabelen, meestal eindigend op \verb+_dich+;
+\item variabelen waarbij niet-substantiële categorieën werden verwijderd, meestal eindigend op \verb+_subst+;
+\item numerieke variabelen voor de berekening van gemiddelden, meestal eindigend op \verb+_n+.
+\end{itemize}
+
+Meer over het gebruik van dit bestand staat in paragraaf \ref{sec:VOS}. Het bestand bevat onder meer:
+\begin{itemize}
+\item \verb+VOSn+: het numerieke nummer van de VOS waarvoor de variabele wordt gebruikt;
+\item \verb+VOSname+: de naam van de VOS waarvoor de variabele wordt gebruikt;
+\item \verb+varname+: de naam van de analysevariabele;
+\item \verb+varlabel+: een label dat kan worden overgenomen in opgeleverde datasets;
+\item \verb+calc_p_value+: een verouderde vlagvariabele die aangaf of voor deze variabele $p$-waarden moesten worden berekend. Deze kolom wordt niet meer gebruikt;
+\item \verb+type+: het type statistiek dat voor deze variabele moet worden berekend:
+\begin{itemize}
+\item \verb+percentage+: voor dichotome logische variabelen (\verb+TRUE/FALSE+);
+\item \verb+multinom+: voor percentages per categorie;
+\item \verb+mean+: voor gemiddelden van numerieke variabelen;
+\end{itemize}
+\item \verb+description+: een inhoudelijke beschrijving van de statistieken.
+\end{itemize}
+
+De kolomnamen van dit bestand kunnen op termijn nog verbeterd worden. Op langere termijn zou dit bestand mogelijk zelfs kunnen verdwijnen indien mappings en analysetypen rechtstreeks vanuit het datamodel en de codelijsten kunnen worden afgeleid.
+
+\end{itemize}
+
+
+\paragraph{Wat kan beter?}
+
+In het vorig werkproces was de meta-informatie meer geïntegreerd, vooral het bestand\\ \url{//WV162699/fs_kb_dkb/svr/4_Beveiligde_data/SV-bevragingen/01_Metadata/variabelen.xlsx}\\
+bevatte veel informatie. Dit bestand had echter ook wat nadelen:
+\begin{itemize}
+\item je kon moeilijk verschillende versies maken van een variabele (bv. als de vewoording licht verandert)
+\item het verschil tussen de steekproef- en de survey-data was onduidelijk en onhandig
+\item Het was moeilijk om de volgorde van de vragen ergens te bewaren per editie
+\end{itemize}
+Om al deze redenen heb ik nu dit bestand uit elkaar gehaald en de informatie bewaart in verschillende bestanden. Daarmee zijn bovenstaande problemen opgelost:
+\begin{itemize}
+\item Als de vraagverwoording verandert kan je dit documenteren in \url{Questions.xlsx} en \url{Answers.xlsx}
+\item het verschil tussen de steekproef- en de survey-data wordt gemaakt omdat er twee aparte bestanden zijn per editie, namelijk \url{SVXXXX_variables_sample.xlsx} en \url{SVXXXX_variables_survey.xlsx} (zie verder).
+\item Het bestand \url{SVXXXX_variables_survey.xlsx} bepaalt ook de volgorde van de vragen voor elke editie apart (zie verder).
+\end{itemize}
+Dit systeem is flexibeler, maar bij het uittesten leek het wel een minder gebruiksvriendelijk. Misschien is het dus beter de bestanden weer op één of andere manier samen te voegen, maar wel met de nieuwe ideeën erin.
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+\subsubsection{Aanmaak codeboek}
+\label{sec:codebook}
+
+De eerste concrete stap in de verwerking van een nieuwe editie is de aanmaak van het codeboek. Dit codeboek wordt doorgestuurd naar het veldwerkbureau en beschrijft welke variabelen verwacht worden, hoe deze benoemd moeten worden en welke labels en antwoordcategorieën van toepassing zijn.
+
+De werkwijze is als volgt:
+
+\begin{enumerate}
+
+\item Als vraag- of antwoordverwoordingen zijn aangepast --- en het gaat enkel om beperkte tekstuele wijzigingen --- werk dan de bestanden
+\begin{quote}
+\url{01_code/03_process_editions/Metadata/Questions.xlsx}
+\end{quote}
+en
+\begin{quote}
+\url{01_code/03_process_editions/Metadata/Answers.xlsx}
+\end{quote}
+bij.
+
+In principe zouden zulke wijzigingen uitzonderlijk moeten zijn. Bij inhoudelijk belangrijke wijzigingen moet eerder een nieuw concept worden gedefinieerd in het datamodel, in plaats van een loutere aanpassing in vraagverwoording, zodat de antwoorden van de oude en nieuwe vragen in aparte variabelen worden bewaard.
+
+\item Zorg ervoor dat het bestand
+\begin{quote}
+\url{01_code/03_process_editions/SVXXXX/input/SVXXXX_variables_survey.xlsx}
+\end{quote}
+klaarstaat.
+
+Dit bestand geeft een overzicht van alle variabelen die door het veldwerkbureau moeten worden opgeleverd. Het bevat onder meer:
+\begin{itemize}[nosep]
+\item \verb+variable+: de naam die verwacht wordt in de dataset die het veldwerkbureau zal opleveren;
+\item \verb+concept_id+: het gestandaardiseerde concept waaraan deze variabele gekoppeld wordt.
+\end{itemize}
+
+De volgorde van de variabelen in dit bestand is belangrijk, omdat deze integraal wordt overgenomen in het codeboek. Voor elke variabele moet een geldig concept bestaan in de DSD. Zo niet zullen de scripts foutmeldingen geven.
+
+\item Maak het script
+\begin{quote}
+\url{01_code/03_process_editions/SVXXXX/01_create_codebook_SVXXXX.R}
+\end{quote}
+aan. Dit kan doorgaans door een script van een vorige editie te kopiëren en het editienummer aan te passen.
+
+In dit script wordt de functie \verb+SVsurvey_create_codebook()+ aangeroepen. Deze functie:
+\begin{itemize}
+\item leest het bestand \url{SVXXXX_variables_survey.xlsx} in;
+\item koppelt de variabelen via \verb+concept_id+ aan de juiste vraagverwoording, variabelelabels, codelijsten en antwoordverwoordingen;
+\item gebruikt daarvoor de DSD, \url{Questions.xlsx} en \url{Answers.xlsx};
+\item compileert het codeboek;
+\item en schrijft het resultaat weg naar:
+\begin{quote}
+\url{03_deriveddata/04_Codebooks/Codebook_SVXXXX.xlsx}
+\end{quote}
+\end{itemize}
+
+\end{enumerate}
+
+\subsubsection{Cleaning van de data}
+\label{sec:cleaning}
+
+Nadat het codeboek is doorgestuurd en het veldwerkbureau de data heeft opgeleverd, kan de feitelijke gegevensverwerking starten. De eerste stap daarin is de validatie en cleaning van de aangeleverde steekproef- en surveydata.
+
+De werkwijze is als volgt:
+
+\begin{enumerate}
+
+\item Zorg ervoor dat de steekproefdata klaarstaat in:
+\begin{quote}
+\url{02_sourcedata/SVXXXX/01_sample}
+\end{quote}
+
+\item Zorg ervoor dat het bestand
+\begin{quote}
+\url{01_code/03_process_editions/SVXXXX/input/SVXXXX_variables_sample.xlsx}
+\end{quote}
+klaarstaat.
+
+Dit bestand geeft een overzicht van de variabelen die uit de steekproefdata worden overgenomen. Het bevat minstens:
+\begin{itemize}[nosep]
+\item \verb+variable+: de naam van de variabele in de steekproefdata;
+\item \verb+concept_id+: de gestandaardiseerde naam die in de gekuiste data gebruikt zal worden.
+\end{itemize}
+
+De namen in kolom \verb+variable+ moeten exact overeenkomen met de kolomnamen in de steekproefdata en zijn hoofdlettergevoelig. Enkel variabelen die relevant zijn voor de cleaning hoeven in dit bestand te worden opgenomen.
+
+\item Zorg ervoor dat de surveydata klaarstaat in:
+\begin{quote}
+\url{02_sourcedata/SVXXXX/02_survey}
+\end{quote}
+Als er meerdere leveringen zijn, is het aanbevolen om submappen aan te maken met de aanleverdatum als mapnaam in het formaat \texttt{YYYYMMDD}.
+
+\item Zorg ervoor dat het bestand
+\begin{quote}
+\url{01_code/03_process_editions/SVXXXX/input/SVXXXX_variables_survey.xlsx}
+\end{quote}
+klaarstaat.
+
+Ook hier moeten de variabelenamen in kolom \verb+variable+ exact overeenkomen met de kolomnamen in de surveydata. De kolom \verb+concept_id+ verwijst opnieuw naar de gestandaardiseerde namen in het datamodel. Variabelen die niet gebruikt worden in de cleaning hoeven niet opgenomen te worden.
+
+\item Maak het script
+\begin{quote}
+\url{01_code/03_process_editions/SVXXXX/02_clean_data_SVXXXX.R}
+\end{quote}
+aan. Dit script bevat eerst eventuele manuele of editie-specifieke voorbereidingen, en daarna de structurele cleaning.
+
+In de praktijk bevat dit script doorgaans volgende blokken:
+
+\begin{enumerate}
+
+\item \textbf{Inladen en voorbereiden van de steekproefdata.}\\
+Zorg ervoor dat:
+\begin{itemize}
+\item enkel de variabelen behouden blijven die in \url{SVXXXX_variables_sample.xlsx} zijn opgelijst;
+\item deze variabelen de juiste namen krijgen;
+\item de waarden voldoen aan de criteria uit de DSD (bijvoorbeeld correcte types, geldige codelijstwaarden, geldige datums, \ldots).
+\end{itemize}
+
+\item \textbf{Inladen en voorbereiden van de surveydata.}\\
+Zorg ervoor dat:
+\begin{itemize}
+\item indien met \texttt{.sav}-bestanden gewerkt wordt, de variable labels correct zijn zoals gedefinieerd in het codeboek. De functie \verb+SVsurvey_labelled_2_tibble()+ kan hierbij gebruikt worden. Deze functie zet de data om naar een nette \verb+tibble+ en controleert ook de labels. Via het tweede argument kunnen correcte labels meegegeven worden als named vector;
+\item correcties op basis van open tekstvakken worden doorgevoerd. Hiervoor zet Tina het bestand
+\begin{quote}
+\url{01_code/03_process_editions/SVXXXX/input/SVXXXX_hercodering_obv_tekstvakken.xlsx}
+\end{quote}
+klaar. Deze correcties kunnen doorgaans vlot worden toegepast met een functie zoals \verb+coalesce_join()+;
+\item indien sportvragen aanwezig zijn, de sportcodering correct wordt verwerkt. Tina documenteert de hercoderingen in:
+\begin{quote}
+\url{01_code/03_process_editions/SVXXXX/input/SVXXXX_hercodering_sport.xlsx}
+\end{quote}
+op basis van:
+\begin{quote}
+\url{01_code/03_process_editions/Metadata/Sports.xlsx}
+\end{quote}
+
+Sporten 1 tot en met 15 worden doorgaans via selectievragen bevraagd en kunnen indien nodig worden gecorrigeerd op basis van open antwoordvakken. Sporten vanaf 16 worden karakterieel opgeslagen in \verb+spt_othx+ als een met puntkomma's gescheiden lijst. Zorg er daarbij voor dat steeds de gestandaardiseerde sportnamen uit \url{Sports.xlsx} worden gebruikt;
+
+\item ook hier enkel de variabelen behouden blijven die nodig zijn voor de cleaning;
+\item ook hier alle variabelen voldoen aan de evaluatiecriteria uit de DSD.
+\end{itemize}
+
+\item \textbf{Uitvoeren van de centrale cleaning.}\\
+Laat vervolgens \verb+SVsurvey_clean_data()+ lopen op de voorbereide steekproef- en surveydata. Deze functie:
+\begin{itemize}
+\item voert controles uit op consistentie en geldigheid;
+\item geeft foutmeldingen wanneer de input niet voldoet;
+\item voert de gestandaardiseerde cleaning uit;
+\item berekent afgeleide variabelen en gewichten;
+\item en schrijft de resultaten weg naar:
+\begin{quote}
+\url{03_deriveddata/05_Cleaned_data}
+\end{quote}
+als \texttt{.parquet}-bestanden.
+\end{itemize}
+
+\end{enumerate}
+
+Als er foutmeldingen optreden, kunnen die verschillende oorzaken hebben. Enkele vaak voorkomende situaties zijn:
+
+\begin{itemize}
+
+\item \textbf{Een waarde in de steekproefdata komt niet voor in een codelijst.}\\
+Dit kan wijzen op een fout in het databestand of op een onvolledigheid in de codelijst. In principe zou het tweede niet mogen voorkomen, maar in de praktijk blijken sommige externe codelijsten niet altijd volledig te zijn. Je kan dan:
+\begin{itemize}[nosep]
+\item de data manueel corrigeren;
+\item of de codelijst structureel uitbreiden.
+\end{itemize}
+Die laatste optie is duurzamer, op voorwaarde dat je zeker bent dat de code effectief correct en herbruikbaar is.
+
+\item \textbf{Een waarde in de surveydata komt niet voor in een codelijst.}\\
+Hier kan de oorzaak liggen in:
+\begin{itemize}[nosep]
+\item het databestand;
+\item de codelijst;
+\item of het bestand \url{Answers.xlsx}.
+\end{itemize}
+Ook hier geldt: pas \url{Answers.xlsx} enkel aan bij echte, bedoelde tekstuele wijzigingen in antwoordverwoording. Gaat het om een fout in de levering door het veldwerkbureau, dan gebeurt de correctie beter lokaal in het cleaning-script.
+
+\item \textbf{Variabelenamen zijn fout.}\\
+Ook dan zijn er meestal twee opties:
+\begin{itemize}[nosep]
+\item ofwel corrigeer je de naam tijdelijk in het script;
+\item ofwel werk je het bestand \url{SVXXXX_variables_sample.xlsx} of \url{SVXXXX_variables_survey.xlsx} bij.
+\end{itemize}
+Die laatste optie is doorgaans netter en duurzamer.
+
+\end{itemize}
+
+\end{enumerate}
+
+\subsubsection{Aanmaak van de VOS'en}
+\label{sec:VOS}
+
+Na de cleaning volgt de aanmaak van de Vlaamse openbare statistieken (VOS'en). Dit zijn de statistieken die gepubliceerd worden op de cijferpagina's en in de cijferapplicatie (Power BI).
+
+Maak hiervoor het script:
+\begin{quote}
+\url{01_code/03_process_editions/SVXXXX/03_create_VOS_SVXXXX.R}
+\end{quote}
+Dit script roept de functie \verb+SVsurvey_create_VOS()+ aan.
+
+Deze functie schrijft:
+\begin{itemize}
+\item een analysedataset weg naar:
+\begin{quote}
+\url{03_deriveddata/06_Analysis_data}
+\end{quote}
+\item en de uiteindelijke VOS-data naar:
+\begin{quote}
+\url{//WV162699/fs_kb_dkb/svr/Beveiligde_data_VSA/999_Public_Use_Files/01_VOSdata/SVsurvey}
+\end{quote}
+\end{itemize}
+
+De functie \verb+SVsurvey_create_VOS()+ is historisch vrij ad hoc gegroeid. De reden is dat analysevragen gefragmenteerd tot stand kwamen en er lange tijd geen heldere afbakening bestond van wat precies als officiële statistiek moest gelden.
+
+In de cijferpagina's worden vaak cumulatieve proporties voor één specifieke categorie getoond, terwijl in de cijferapplicatie soms percentages per categorie worden weergegeven. Daarom wordt eerst een analysedataset opgebouwd waarin variabelen in de juiste vorm worden klaargezet voor analyse, bijvoorbeeld:
+\begin{itemize}[nosep]
+\item door variabelen te dichotomiseren;
+\item door niet-substantiële categorieën te verwijderen;
+\item door categorische variabelen om te zetten naar numerieke schalen voor gemiddelden.
+\end{itemize}
+
+Deze analysedataset wordt ook weggeschreven naar:
+\begin{quote}
+\url{//WV162699/fs_kb_dkb/svr/Beveiligde_data_VSA/021_SVbevraging/03_deriveddata/06_Analysis_data}
+\end{quote}
+
+Alle analysevariabelen zijn opgelijst in:
+\begin{quote}
+\url{01_code/03_process_editions/Metadata/Variables_for_VOS.xlsx}
+\end{quote}
+
+Na de aanmaak van de analysedataset worden drie typefuncties iteratief toegepast naargelang de kolom \verb+type+ in \url{Variables_for_VOS.xlsx}:
+\begin{itemize}[nosep]
+\item berekening van gemiddelden;
+\item berekening van proporties;
+\item berekening van multinomiale proporties.
+\end{itemize}
+
+De resulterende VOS'en worden weggeschreven naar:
+\begin{quote}
+\url{//WV162699/fs_kb_dkb/svr/Beveiligde_data_VSA/999_Public_Use_Files/01_VOSdata/SVsurvey/VOS}
+\end{quote}
+
+Daarnaast worden ook item- en unitnonresponsgraden berekend voor gebruik op de cijferpagina's. Deze worden weggeschreven naar:
+\begin{quote}
+\url{//WV162699/fs_kb_dkb/svr/Beveiligde_data_VSA/999_Public_Use_Files/01_VOSdata/SVsurvey/respons_rates}
+\end{quote}
+
+\paragraph{Wat kan beter?}
+
+\begin{enumerate}
+\item De definitie van de officiële statistieken kan scherper worden afgebakend. Een mogelijke keuze is om alle cumulatieve proporties over ordinale antwoordschalen als officiële statistieken te beschouwen. De cijferpagina's zouden dan enkel één geselecteerde categorie tonen, terwijl de cijferapplicatie alle cumulatieve categorieën kan tonen.
+
+\item Een deel van de mapping van bronvariabelen naar analysevariabelen kan mogelijk rechtstreeks worden afgeleid uit mappings die al in de codelijsten aanwezig zijn. In dat geval zou een apart bestand zoals \url{Variables_for_VOS.xlsx} gedeeltelijk of volledig overbodig kunnen worden.
+
+\item De outputtabellen met VOS'en zijn nog onvoldoende formeel gekoppeld aan het datamodel. Ook de kolomnamen kunnen nog consistenter worden gemaakt.
+\end{enumerate}
+
+\textbf{Opgelet:} de data in
+\begin{quote}
+\url{//WV162699/fs_kb_dkb/svr/Beveiligde_data_VSA/999_Public_Use_Files/01_VOSdata/SVsurvey/VOS}
+\end{quote}
+vormt de bron voor de Power BI-applicatie. Als variabelenamen wijzigen, moet dit ook in Power BI worden aangepast.
+
+
+
+
+\subsection{Klaarzetten van tabellen voor de cijferpagina's}
+\label{sec:cijferpaginas}
+
+Wanneer de VOS-data beschikbaar is, kunnen daaruit datasets en tabellen worden afgeleid voor de cijferpagina's. Deze tabellen worden nadien rechtstreeks ingeladen in Datawrapper, zodat manuele aanpassingen in principe niet nodig zijn.
+
+Dit gebeurt via het script:
+\begin{quote}
+\url{01_code/04_publish_tables_cijferpaginas/publish_tables_cijferpaginas.R}
+\end{quote}
+
+Het script leest automatisch de VOS-cijfers in uit:
+\begin{quote}
+\url{//WV162699/fs_kb_dkb/svr/Beveiligde_data_VSA/999_Public_Use_Files/01_VOSdata/SVsurvey}
+\end{quote}
+
+De tabellen worden aangemaakt op basis van een beperkt aantal grafiektemplates. Een overzicht van alle te genereren tabellen en grafieken staat in:
+\begin{quote}
+\url{01_code/04_publish_tables_cijferpaginas/tables_cijferpagina.xlsx}
+\end{quote}
+
+Het script leest dit bestand in en maakt alle tabellen of grafieken aan die erin zijn opgelijst. Het bestand bevat onder meer volgende kolommen:
+
+\begin{itemize}
+\item \verb+VOSn+: het nummer van de VOS waartoe de grafiek behoort;
+\item \verb+VOSlabel+: het label van de VOS waartoe de grafiek behoort;
+\item \verb+graphtype+: het type of de template van de grafiek;
+\item \verb+table+: de naam van het bestand dat wordt aangemaakt;
+\item \verb+variables+: lijst van variabelen die in de tabel opgenomen worden, gescheiden door puntkomma's;
+\item \verb+covariate+: het achtergrondkenmerk waarnaar wordt opgesplitst;
+\item \verb+graphtype_description+: inhoudelijke beschrijving van de grafiek. Deze kolom wordt momenteel niet gebruikt, maar is wel nuttig als documentatie.
+\end{itemize}
+
+Voor elk \verb+graphtype+ bestaat er in het script een aparte functie. Het script groepeert de rijen per grafiektype en past vervolgens de juiste templatefunctie toe.
+
+De volgende grafiektypes zijn momenteel gedefinieerd:
+
+\begin{itemize}
+\item \verb+evolutionCI+: evolutie van cijfers over de tijd met betrouwbaarheidsintervallen;
+\item \verb+backgroundCI+: cijfers voor de laatste editie, opgesplitst naar achtergrondkenmerken, met betrouwbaarheidsintervallen;
+\item \verb+lastobservationCI+: cijfers voor de laatste editie, met alle items van een vraag in één tabel;
+\item \verb+evolutioncolumns+: evolutie in tabelvorm met tijdsdimensie in kolommen;
+\item \verb+lastobservationbycovarcolumns+: cijfers voor de laatste editie, uitgesplitst naar een achtergrondkenmerk, met achtergrondkenmerken in kolommen;
+\item \verb+lastobservationcolumns+: cijfers voor de laatste editie, met alle antwoordcategorieën in kolommen;
+\item \verb+top10bar+: cijfers voor de laatste editie, beperkt tot de top 10 categorieën.
+\end{itemize}
+
+Wanneer een nieuwe grafiek past binnen een bestaande template, volstaat het om een extra rij toe te voegen aan \url{tables_cijferpagina.xlsx}. Wanneer een nieuw type visualisatie nodig is, moet daarvoor een nieuwe functie worden toegevoegd aan het script.
+
+De tabellen --- en sporadisch ook statische grafieken --- worden weggeschreven naar:
+\begin{quote}
+\url{//WV162699/fs_kb_dkb/svr/Beveiligde_data_VSA/999_Public_Use_Files/02_CPdata}
+\end{quote}
+
+\paragraph{Wat kan beter?}
+
+Momenteel worden de tabellen voor de cijferpagina's telkens opnieuw aangemaakt voor alle VOS'en, ook wanneer die in de laatste editie niet werden bevraagd. Dat is niet efficiënt. Op langere termijn wordt dit best omgezet naar een editie-specifieke functie binnen:
+\begin{quote}
+\url{//WV162699/fs_kb_dkb/svr/Beveiligde_data_VSA/021_SVbevraging/01_code/03_process_editions}
+\end{quote}
+zodat enkel de tabellen worden opgebouwd voor de VOS'en die daadwerkelijk in de betrokken editie voorkomen.
+
+
+
+
+\subsection{Creatie van handleiding en technische nota}
+
+De volgende stap is de aanmaak van de handleiding en de technische nota. Dit gebeurt via het script:
+\begin{quote}
+\url{//WV162699/fs_kb_dkb/svr/Beveiligde_data_VSA/021_SVbevraging/01_code/05_Create_manual_and_technical_note/create_documentation.R}
+\end{quote}
+
+De handleiding en de technische nota worden gecompileerd met \LaTeX. Daarvoor moet een \LaTeX-distributie geïnstalleerd zijn op de computer. Annelies en ik gebruiken MiKTeX:
+\begin{quote}
+\url{https://miktex.org/howto/install-miktex}
+\end{quote}
+Dit programma is niet beschikbaar via het bedrijfsportaal en moet dus via IT worden geïnstalleerd.
+
+De inhoud van de handleiding en technische nota vertrekt vanuit het \texttt{.tex}-bestand:
+\begin{quote}
+\url{//WV162699/fs_kb_dkb/svr/Beveiligde_data_VSA/021_SVbevraging/01_code/05_Create_manual_and_technical_note/Input/Handleiding_SV-bevragingen.tex}
+\end{quote}
+
+In dit bestand kunnen tekstuele aanpassingen worden gemaakt. Het document bevat macro's waarmee onderscheid kan worden gemaakt tussen:
+\begin{itemize}[nosep]
+\item delen die enkel in de handleiding terechtkomen;
+\item en delen die zowel in de handleiding als in de technische nota worden opgenomen.
+\end{itemize}
+
+Daarnaast voegt het \verb+R+-script automatisch tabellen in, bijvoorbeeld met een overzicht van de vragen of van de responsgraden. Het \verb+R+-script compileert ook automatisch de \LaTeX-bestanden.
+
+De handleiding en technische nota worden weggeschreven naar:
+\begin{quote}
+\url{//WV162699/fs_kb_dkb/svr/Beveiligde_data_VSA/999_Public_Use_Files/04_microdata}
+\end{quote}
+
+\paragraph{Wat kan beter?}
+
+De inhoud van de handleiding en de technische nota overlapt momenteel sterk. Op termijn is het wenselijk om duidelijker af te spreken:
+\begin{itemize}[nosep]
+\item welke informatie intern in de handleiding thuishoort;
+\item welke informatie extern in de technische nota gepubliceerd wordt;
+\item en welke onderdelen best automatisch uit metadata en scripts worden gegenereerd.
+\end{itemize}
+
+
+
+\subsection{Creatie van Public en Scientific Use Files}
+
+De laatste stap in het proces is de aanmaak van de Public Use File (PUF) en de Scientific Use File (SUF) voor de microdata. Dit gebeurt via het script:
+\begin{quote}
+\url{//WV162699/fs_kb_dkb/svr/Beveiligde_data_VSA/021_SVbevraging/01_code/06_Publish_PUF_SUF/Publish_PUF_SUF.R}
+\end{quote}
+
+Dit script maakt gebruik van het bestand:
+\begin{quote}
+\url{//WV162699/fs_kb_dkb/svr/Beveiligde_data_VSA/021_SVbevraging/01_code/06_Publish_PUF_SUF/Input/Variables_Use_files.xlsx}
+\end{quote}
+
+Dit bestand bevat een overzicht van alle variabelen die in beide use files mogen worden opgenomen. Het bevat minstens volgende kolommen:
+\begin{itemize}
+\item \verb+concept_id+: de naam van de variabele;
+\item \verb+ScientificUseFile+: bevat een \verb+x+ wanneer de variabele opgenomen wordt in de Scientific Use File;
+\item \verb+PublicUseFile+: bevat een \verb+x+ wanneer de variabele opgenomen wordt in de Public Use File.
+\end{itemize}
+
+Het \verb+R+-script leest dit bestand in, selecteert op basis daarvan de juiste variabelen uit de gekuiste data en schrijft de bestanden weg als \texttt{.sav}-bestanden. Daarbij worden de juiste variabelelabels en value labels toegevoegd, zodat gebruikers een bruikbaar en net bestand krijgen.
+
+Als variabelen moeten worden toegevoegd of verwijderd uit de use files, volstaat het dus om \url{Variables_Use_files.xlsx} aan te passen. De scripts zelf hoeven daarvoor normaal niet gewijzigd te worden.
+
+De Scientific Use File wordt weggeschreven naar:
+\begin{quote}
+\url{//WV162699/fs_kb_dkb/svr/Beveiligde_data_VSA/998_Scientific_Use_Files/021_SVbevraging}
+\end{quote}
+
+De Public Use File wordt weggeschreven naar:
+\begin{quote}
+\url{//WV162699/fs_kb_dkb/svr/Beveiligde_data_VSA/999_Public_Use_Files/04_microdata}
+\end{quote}
+
+\paragraph{Wat kan beter?}
+
+Momenteel wordt steeds één grote public use file en één grote scientific use file aangemaakt waarin alle edities van de SV-bevraging zijn samengevoegd. Die keuze werd destijds gemaakt omdat collega's moeilijkheden hadden om edities zelf correct te koppelen.
+
+Op termijn is deze aanpak echter niet houdbaar, omdat de bestanden steeds groter worden. Het is daarom beter om per editie een afzonderlijke PUF en SUF aan te maken. Ook dit script wordt dus bij voorkeur omgezet naar editie-specifieke functionaliteit binnen:
+\begin{quote}
+\url{//WV162699/fs_kb_dkb/svr/Beveiligde_data_VSA/021_SVbevraging/01_code/03_process_editions}
+\end{quote}
+zodat enkel de bestanden voor de betrokken editie worden gegenereerd.
+
+
+
+
+
+
+
+\section{Nieuwe vragen}
+
+Wanneer er een nieuwe vraag wordt toegevoegd aan de SV-bevraging, moet een reeks opeenvolgende stappen worden doorlopen die het volledige verwerkingsproces bestrijken: van het datamodel tot de publicatie. Doorloop deze stappen in de aangegeven volgorde, omdat elke stap voortbouwt op de vorige.
+
+\begin{enumerate}
+
+\item \textbf{Maak of actualiseer de codelijst in het datamodel.}\\
+Als de nieuwe vraag antwoordcategorieën bevat die nog niet voorkomen in de bestaande codelijsten, moet een nieuwe codelijst worden aangemaakt of een bestaande codelijst worden uitgebreid.
+
+Controleer eerst of de benodigde waarden al voorkomen in:
+\begin{quote}
+\url{01_code/01_data_model/01_code_lists/01_general_codelists/input/code_list_values.xlsx}
+\end{quote}
+Voeg ontbrekende waarden daar toe. Definieer vervolgens de structuur van de nieuwe codelijst in:
+\begin{quote}
+\url{input/code_list_skeletons.xlsx}
+\end{quote}
+Voer daarna \url{create_code_lists.R} opnieuw uit zodat de codelijst wordt aangemaakt in:
+\begin{quote}
+\url{03_deriveddata/01_codelists}
+\end{quote}
+
+Zie paragraaf \ref{sec:codelijsten} voor meer uitleg.
+
+\item \textbf{Voeg een nieuw concept toe aan de DSD.}\\
+Voeg de nieuwe variabele toe aan:
+\begin{quote}
+\url{01_code/01_data_model/02_DSD/dsd_variables.xlsx}
+\end{quote}
+
+Vul daarbij alle relevante kolommen correct in:
+\begin{itemize}[nosep]
+\item \verb+concept_id+;
+\item beschrijving;
+\item labels in de beschikbare talen;
+\item datatype;
+\item codelijst, indien van toepassing;
+\item eventuele validatieregels.
+\end{itemize}
+
+Voer daarna \url{check_and_publish_dsd.R} uit. Dit script valideert de invoer en schrijft de bijgewerkte DSD weg naar:
+\begin{quote}
+\url{03_deriveddata/02_DSD/dsd.xlsx}
+\end{quote}
+Werk pas verder wanneer deze stap zonder foutmeldingen is doorlopen.
+
+\item \textbf{Registreer de vraagverwoording in \url{Questions.xlsx}.}\\
+Voeg een rij toe aan:
+\begin{quote}
+\url{01_code/03_process_editions/Metadata/Questions.xlsx}
+\end{quote}
+
+Koppel de vraagverwoording aan het juiste \verb+concept_id+ en vul minstens de kolommen \verb+question+, \verb+question_item+, \verb+question_module+ en \verb+from_surv_id+ correct in.
+
+Zie paragraaf \ref{sec:codebook} voor meer uitleg.
+
+\item \textbf{Registreer de antwoordverwoordingen in \url{Answers.xlsx}.}\\
+Voeg de relevante antwoordverwoordingen toe aan:
+\begin{quote}
+\url{01_code/03_process_editions/Metadata/Answers.xlsx}
+\end{quote}
+
+Koppel elke antwoordverwoording aan de juiste \verb+value+ uit de codelijst en vul opnieuw \verb+from_surv_id+ in.
+
+Zie paragraaf \ref{sec:cleaning} voor meer uitleg.
+
+\item \textbf{Neem de variabele op in de cleaning.}\\
+Voeg de nieuwe variabele toe aan:
+\begin{quote}
+\url{01_code/03_process_editions/SVXXXX/input/SVXXXX_variables_survey.xlsx}
+\end{quote}
+
+Vul in kolom \verb+variable+ de naam in zoals het veldwerkbureau die aanlevert, en in kolom \verb+concept_id+ de gestandaardiseerde naam uit de DSD.
+
+Pas vervolgens indien nodig ook het script
+\begin{quote}
+\url{01_code/03_process_editions/SVXXXX/02_clean_data_SVXXXX.R}
+\end{quote}
+aan, bijvoorbeeld wanneer bijkomende correcties op open tekstvakken nodig zijn.
+
+Zie paragraaf \ref{sec:cleaning}.
+
+\item \textbf{Werk de centrale cleaningfunctie bij indien nodig.}\\
+Wanneer de nieuwe variabele een specifieke bewerking vereist tijdens de geautomatiseerde cleaning --- bijvoorbeeld een afgeleide variabele, een specifieke hercodering of een niet-standaard validatieregel --- dan moet dit worden toegevoegd aan:
+\begin{quote}
+\url{01_code/00_functions/R}
+\end{quote}
+meer specifiek in de functie \verb+SVsurvey_clean_data()+.
+
+Documenteer zulke wijzigingen via Roxygen2 in de code zelf. Wees voorzichtig met wijzigingen in deze functie, omdat ze impact hebben op alle edities.
+
+\item \textbf{Neem de variabele op in de VOS-aanmaak.}\\
+Voeg de nieuwe analysevariabele(n) toe aan:
+\begin{quote}
+\url{01_code/03_process_editions/Metadata/Variables_for_VOS.xlsx}
+\end{quote}
+
+Definieer:
+\begin{itemize}[nosep]
+\item de naam van de analysevariabele;
+\item het relevante VOS-nummer en VOS-label;
+\item het type statistiek (\verb+percentage+, \verb+multinom+ of \verb+mean+);
+\item en een bruikbare beschrijving.
+\end{itemize}
+
+Pas ook het script
+\begin{quote}
+\url{01_code/03_process_editions/SVXXXX/03_create_VOS_SVXXXX.R}
+\end{quote}
+aan wanneer de analysevariabele nog expliciet moet worden aangemaakt in de analysedataset.
+
+Zie paragraaf \ref{sec:VOS}.
+
+\item \textbf{Neem de variabele op in de PUF en/of SUF.}\\
+Voeg de variabele toe aan:
+\begin{quote}
+\url{01_code/06_Publish_PUF_SUF/Input/Variables_Use_files.xlsx}
+\end{quote}
+
+Zet een \verb+x+ in de kolom \verb+ScientificUseFile+ en/of \verb+PublicUseFile+ naargelang de variabele mag worden opgenomen in de relevante use file.
+
+Wanneer er twijfel bestaat over de privacygevoeligheid van een variabele, overleg dan eerst met de data manager of DPO voordat de variabele in een PUF wordt opgenomen.
+
+\item \textbf{Voorzie tabellen of grafieken voor de cijferpagina's.}\\
+Voeg indien nodig één of meerdere rijen toe aan:
+\begin{quote}
+\url{01_code/04_publish_tables_cijferpaginas/tables_cijferpagina.xlsx}
+\end{quote}
+
+Gebruik een bestaand \verb+graphtype+ wanneer de gewenste visualisatie al ondersteund wordt. Als een nieuw type visualisatie nodig is, moet daarvoor een nieuwe functie worden toegevoegd aan:
+\begin{quote}
+\url{publish_tables_cijferpaginas.R}
+\end{quote}
+
+Zie paragraaf \ref{sec:cijferpaginas} voor een overzicht van de beschikbare grafiektypes.
+
+\end{enumerate}
+
+
+
+
+\end{document}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\documentclass{VSAnote}
+
+\usepackage{ulem}
+\hypersetup{
+    hidelinks=false,
+    colorlinks=false,
+    urlbordercolor=lightskyblue,   % blue border for URLs
+    linkbordercolor=lightskyblue,  % red border for internal links
+    pdfborderstyle={/S /U /W 1},  % /U = underline, /W = width
+	}
 
 \begin{document}
 
@@ -25,12 +1146,11 @@
 
     \begin{itemize}
 
-    \item \url{01_code}: Bevat alle verwerkingscode voor de SV-bevraging. De map wordt gesynchroniseerd met GitHub:
-        \url{https://github.com/vsa-datascience/SVsurvey.git}
+    \item \url{01_code}: Bevat alle verwerkingscode voor de SV-bevraging. Deze map kan gesynchroniseerd worden met Github.
     
     	Opmerking 1: naast scripts omvat deze map ook datasets die manueel worden aangemaakt om het productieproces overzichtelijk te houden --- een werkwijze die binnen de VSA nog niet standaard is. 
     
-   		Opmerking 2: De codes bevatten nu ook processtappen die op termijn beter op algemeen niveau binnen de VSA door dedicated teams zouden moeten worden beheerd en uitgevoerd. Het gaat hierbij om de aanmaak van algemene programmeerfuncties, het beheer van het datamodel, en de aggregatie van demografische bevolkingsdata voor de berekening van de gewichten. 
+   		Opmerking 2: De codes bevatten ook processtappen die op termijn beter binnen de VSA door aparte dedicated teams zouden moeten worden beheerd en uitgevoerd. Het gaat hierbij om de aanmaak van algemene programmeerfuncties, het beheer van het datamodel, en de aggregatie van demografische bevolkingsdata voor de berekening van de gewichten. 
 
     \item \url{02_sourcedata}: Opslagplaats voor alle aangeleverde ruwe datasets, onderverdeeld per versie (\url{SV0001}, \url{SV0002}, \url{SV0003},~\ldots). 
     	Elke versie bevat twee submappen:
@@ -297,8 +1417,8 @@ De eerste stap in de verwerking van een SV-bevraging is de aanmaak van het codeb
 	\url{01_code/03_process_editions/SVXXXX/01_create_codebook_SVXXXX.R}\\
 	aan (kopieer dit uit een vorige editie en pas de editie aan). In dit script wordt de functie \verb+SVsurvey_create_codebook()+ aangeroepen. Deze functie laadt het bestand\\
 		\url{01_code/03_process_editions/SVXXXX/input/SVXXXX_variables_survey.xlsx}\\
-		in, koppelt dit via \verb+concept_id+ aan de juiste vraagverwoording, variable labels, codelijsten, en antwoordverwoordingen uit de Data Structuur Definitie, \path{Questions.xlsx} en \path{Answers.xlsx}, compileert het codeboek, en schrijft dit weg naar het bestand\\
-		\path{03_deriveddata/04_Codebooks/Codebook_SVXXXX.xlsx}. Klaar!
+		in, koppelt dit via \verb+concept_id+ aan de juiste vraagverwoording, variable labels, codelijsten, en antwoordverwoordingen uit de Data Structuur Definitie, \url{Questions.xlsx} en \url{Answers.xlsx}, compileert het codeboek, en schrijft dit weg naar het bestand\\
+		\url{03_deriveddata/04_Codebooks/Codebook_SVXXXX.xlsx}. Klaar!
 \end{enumerate} 
 
 
@@ -312,14 +1432,14 @@ Nadat het codeboek is doorgestuurd naar het veldwerkbureau, en dat bureau het ve
 \begin{enumerate}
 
 \item De steekproefdata moet klaar staan in map\\
-	\path{02_sourcedata/SVXXXX/01_sample}
+	\url{02_sourcedata/SVXXXX/01_sample}
 
 \item Zorg ervoor dat het bestand\\
 	\url{01_code/03_process_editions/SVXXXX/input/SVXXXX_variables_sample.xlsx}\\
 	klaarstaat. Dit bestand geeft een overzicht van alle variabelen die worden gebruikt in de sample data (kolom \verb+variable+) en die worden overgezet naar een gestandardiseerde variabele in de gekuiste data. De variabelenamen in kolom  \verb+variable+ moeten overeenkomen met kolomnamen in de sample data (!hoofdlettergevoelig). Het bestand geeft ook aan hoe die variabele zal worden genoemd in de gekuiste data (kolom \verb+concept_id+). Voor elke gebruikte variabele moet er een concept gedefinieerd zijn, anders krijg je foutmeldingen als je de scripts laat lopen. Variabelen die niet worden gebruikt voor de cleaning moeten niet in dit bestand worden opgenomen.
 
 \item De responsdata moet klaarstaan in map\\
-	\path{02_sourcedata/SVXXXX/02_survey}\\
+	\url{02_sourcedata/SVXXXX/02_survey}\\
 	Advies, als er verschillende versie binnenkomen, maak dan submappen aan met de datum als mapnaam in ``YYYYMMDD''
 	
 \item Zorg ervoor dat het bestand\\
@@ -327,35 +1447,35 @@ Nadat het codeboek is doorgestuurd naar het veldwerkbureau, en dat bureau het ve
 	klaarstaat. Dit bestand geeft een overzicht van alle variabelen die worden verwacht te worden opgeleverd door het veldwerkbureau en welke naam moet worden gebruikt voor elke variabele (kolom \verb+variable+). De variabelenamen in kolom  \verb+variable+ moeten overeenkomen met kolomnamen in de survey data (!hoofdlettergevoelig). Het bestand geeft ook aan hoe die variabele zal worden omgezet naar een concept (gestandardiseerde variabele) in de gekuiste data (kolom \verb+concept_id+). Voor elke variabele moet er een concept gedefinieerd zijn, anders krijg je foutmeldingen als je de scripts laat lopen. Variabelen die niet worden gebruikt voor de cleaning moeten niet in dit bestand worden opgenomen.
 	
 \item Maak de code\\
-	\path{01_code\03_process_editions\SVXXXX\02_clean_data_SV0001.R}\\
+	\url{01_code/03_process_editions/SVXXXX/02_clean_data_SV0001.R}\\
 	om de data manueel te cleanen, en vevolgens structureel. Deze code bevat over het algemeen volgende blokken:
 	\begin{enumerate}
 	\item Inladen en klaarzetten van de steekproefdata. Zorg hierbij ervoor dat
 		\begin{itemize}
-		\item de data nog enkel de variabelen bevatten die worden gebruikt voor de cleaning met de juiste naam (dus de variabelen opgelijst in \path{SVXXXX_variables_sample.xlsx}).
+		\item de data nog enkel de variabelen bevatten die worden gebruikt voor de cleaning met de juiste naam (dus de variabelen opgelijst in \url{SVXXXX_variables_sample.xlsx}).
 		\item alle variabelen voldoen aan de evaluatie criteria in de DSD (juiste type [numeriek, character, codebook,\ldots], juiste codebook-waarden hebben, \ldots)
 		\end{itemize}
 	\item Inladen en klaarzetten van de surveydata. Zorg hierbij ervoor dat:
 		\begin{itemize}
 		\item als er met .sav bestanden wordt gewerkt, de variable-labels juist zijn zoals in het codebook. Via de functie \verb+SVsurvey_labelled_2_tibble+ wordt de data automatisch opgeschoond maar worden de variable labels ook nagekeken. Het tweede argument in deze functie laat toe correcte labels te voorzien als een named vector.
-		\item dat correctie op basis van open tekstvakken worden doorgevoerd. Hiervoor zet Tina het bestand\\ \path{01_code\03_process_editions\SVXXXX\input\SV0001_hercodering_obv_tekstvakken.xlsx}\\
+		\item dat correctie op basis van open tekstvakken worden doorgevoerd. Hiervoor zet Tina het bestand\\ \url{01_code/03_process_editions/SVXXXX/input/SV0001_hercodering_obv_tekstvakken.xlsx}\\
 		klaar. Je kan de correcties snel implementeren via de \verb+coalesce_join()+ functie.
 		\item Als de sportvragen aanwezig zijn, dat deze worden gecodeerd. Tina documenteert de hercodering in bestand\\
-		\path{01_code\03_process_editions\SVXXXX\input\SV0014_hercodering_sport.xlsx}\\
+		\url{01_code/03_process_editions/SVXXXX/input/SV0014_hercodering_sport.xlsx}\\
 		op basis van\\
-		\path{01_code\03_process_editions\Metadata\Sports.xlsx}.\\
-		Sporten 1 tot 15 worden bevraagd via selectievragen en moeten eventueel worden gecorigeerd op basis van de open antwoordvakken net zoals de andere variabelen in het bestand. Sporten 16-\ldots worden karakteriëel opgeslagen in variabele \verb+spt_othx+, als een semicolon-separated (;) lijst. Zorg hierbij er zeker voor dat de gestandardiseerde sportnamen uit \path{Sports.xlsx} worden gebruikt.
-		\item de data nog enkel de variabelen bevatten die worden gebruikt voor de cleaning met de juiste naam (dus de variabelen opgelijst in 			\path{SVXXXX_variables_sample.xlsx}).
+		\url{01_code/03_process_editions/Metadata/Sports.xlsx}.\\
+		Sporten 1 tot 15 worden bevraagd via selectievragen en moeten eventueel worden gecorigeerd op basis van de open antwoordvakken net zoals de andere variabelen in het bestand. Sporten 16-\ldots worden karakteriëel opgeslagen in variabele \verb+spt_othx+, als een semicolon-separated (;) lijst. Zorg hierbij er zeker voor dat de gestandardiseerde sportnamen uit \url{Sports.xlsx} worden gebruikt.
+		\item de data nog enkel de variabelen bevatten die worden gebruikt voor de cleaning met de juiste naam (dus de variabelen opgelijst in \url{SVXXXX_variables_sample.xlsx}).
 		\item alle variabelen voldoen aan de evaluatiecriteria in de DSD (juiste type [numeriek, character, codebook,\ldots], juiste codebook-waarden hebben, \ldots)
 		\end{itemize}	
 	\item Laat de \verb+SVsurvey_clean_data()+ lopen op de steekrpoef en survey-data. Deze functie voert alle checks uit op consistenties en zal errors geven als iets niet juist staat. Nadien voert het de gestandardiseerde data-cleaning uit (zoals afgeleide variabelen berekenen, gewichten berekenen, etc.) en schrijft de data weg naar\\
-	\path{03_deriveddata\05_Cleaned_data} als \path{.parquet}-bestanden. 
+	\url{03_deriveddata/05_Cleaned_data} als \url{.parquet}-bestanden. 
 	\end{enumerate}
 	Als er iets niet in orde is, zal je foutmeldingen krijgen. 	Wat als je errors krijgt? Dit kan meerdere oorzaken hebben maar ook meerdere oplossingen:
 	\begin{itemize}
 	\item Een waarde in de steekproefdata komt niet voor in een codelijst. Dit kan zowel een fout zijn in het databestand als in de codelijst zelf. Dat laatste zou in principe niet mogen voorkomen, maar de praktijk leert dat bijvoorbeeld de codelijsten met landencodes van Statbel (\verb+cl_countryNIS+) niet compleet zijn (o.a. gebruikt voor geboorteland en nationaliteit). Je kan dan ofwel de steekproef-/survey data aanpassen manueel, of je kan de codelijsten updaten. Dat laatste is uiteraard duurzamer zolang je zeker bent dat de code consistent door Statbel wordt gebruikt. Als je de data zelf corrigeert gebruik dan functies zoals \verb+dplyr::replace_values()+ in een \verb+dplyr::mutate()+ stap.
-	\item Een waarde in de surveydata komt niet voor in een codelijst. Dit kan zowel een fout zijn in het databestand als in de codelijst zelf, maar hier ook in bestand in het bestand \path{Answers.xlsx}. Je kan dezelfde oplossing kiezen als het punt hiervoor, of je kan bestand \path{Answers.xlsx} aanpassen. Pas \path{Answers.xlsx} echter enkel aan als het echt om een gevraagde kleine wijziging in vraagverwoording gaat, want deze wijzigingen zullen meegenomen worden naar de volgende edities. Als het veldwerkbureau gewoon een verkeerde waarde heeft aangeleverd, vervang je dit best manueel via functies zoals \verb+dplyr::replace_values()+ in een \verb+dplyr::mutate()+ stap.
-	\item Variabelenamen zijn fout. Dan heb je opnieuw twee opties. Ofwel verander je de variabelenaam manueel in de code, ofwel corrigeer je de variabelenaam in de bestanden \path{SVXXXX_variables_sample.xlsx} of \path{SVXXXX_variables_survey.xlsx}. Die laatste optie is natuurlijk veel eleganter.
+	\item Een waarde in de surveydata komt niet voor in een codelijst. Dit kan zowel een fout zijn in het databestand als in de codelijst zelf, maar hier ook in bestand in het bestand \url{Answers.xlsx}. Je kan dezelfde oplossing kiezen als het punt hiervoor, of je kan bestand \url{Answers.xlsx} aanpassen. Pas \url{Answers.xlsx} echter enkel aan als het echt om een gevraagde kleine wijziging in vraagverwoording gaat, want deze wijzigingen zullen meegenomen worden naar de volgende edities. Als het veldwerkbureau gewoon een verkeerde waarde heeft aangeleverd, vervang je dit best manueel via functies zoals \verb+dplyr::replace_values()+ in een \verb+dplyr::mutate()+ stap.
+	\item Variabelenamen zijn fout. Dan heb je opnieuw twee opties. Ofwel verander je de variabelenaam manueel in de code, ofwel corrigeer je de variabelenaam in de bestanden \url{SVXXXX_variables_sample.xlsx} of \url{SVXXXX_variables_survey.xlsx}. Die laatste optie is natuurlijk veel eleganter.
 	\end{itemize}
 \end{enumerate}
 
@@ -367,36 +1487,36 @@ Nadat het codeboek is doorgestuurd naar het veldwerkbureau, en dat bureau het ve
 \label{sec:VOS}
 
 De volgende stap is de aanmaak van de Openbare statistieken. Dit zijn alle statistieken die worden gepubliceerd op de cijferpagina's en in de cijferapplicatie (PowerBI). Maak hiervoor het script\\
-\path{01_code\03_process_editions\SVXXXX\03_create_VOS_SVXXXX.R}\\
+\url{01_code/03_process_editions/SVXXXX/03_create_VOS_SVXXXX.R}\\
 aan. Deze roept de functie \verb+SVsurvey_create_VOS()+ aan, waarna een analysedataset wordt weggeschreven in\\
-\path{03_deriveddata\06_Analysis_data}\\
+\url{03_deriveddata/06_Analysis_data}\\
 en data met alle VOS'en in\\
-\path{\\WV162699\fs_kb_dkb\svr\Beveiligde_data_VSA\999_Public_Use_Files\01_VOSdata\SVsurvey}
+\url{//WV162699/fs_kb_dkb/svr/Beveiligde_data_VSA/999_Public_Use_Files/01_VOSdata/SVsurvey}
 
 De functie \verb+SVsurvey_create_VOS()+ is heel ad-hoc opgesteld en kan nog sterk verbeterd en vereenvoudigd worden. De reden hiervoor is dat de vragen voor analyse heel gefragmenteerd binnenkwamen en er ook nog geen visie is over wat nu de officiële statistieken zijn. Op de cijferpagina's worden cumulatieve proporties getoond voor één categorie per variabele, in de cijferapplicatie werd dit plots veranderd naar de proporties per categorie. In de code zal je daarom zien dat ik eerst een analysedataset maak waarbij ik variabelen klaarzet voor verwerking, zoals dichotomiseren of verwijderen van niet-substantiële waarden. Die analysedataset wordt ook weggeschreven naar\\
-\path{\\WV162699\fs_kb_dkb\svr\Beveiligde_data_VSA\021_SVbevraging\03_deriveddata\06_Analysis_data}\\
+\url{//WV162699/fs_kb_dkb/svr/Beveiligde_data_VSA/021_SVbevraging/03_deriveddata/06_Analysis_data}\\
 Alle analysevariabelen worden ook opgelijst in\\
-\path{01_code\03_process_editions\Metadata\Variables_for_VOS.xlsx}\\
+\url{01_code/03_process_editions/Metadata/Variables_for_VOS.xlsx}\\
 Na de aanmaak van de analyse dataset worden drie functies (om gemiddelden, proporites en multinomiale proporties te berekenen) iteratief gemapt op de variabelen volgens kolom 
-\verb+type+ in \path{Variables_for_VOS.xlsx}. Dit zijn de VOS'en en worden weggeschreven in\\
-\path{\\WV162699\fs_kb_dkb\svr\Beveiligde_data_VSA\999_Public_Use_Files\01_VOSdata\SVsurvey\VOS}.
+\verb+type+ in \url{Variables_for_VOS.xlsx}. Dit zijn de VOS'en en worden weggeschreven in\\
+\url{//WV162699/fs_kb_dkb/svr/Beveiligde_data_VSA/999_Public_Use_Files/01_VOSdata/SVsurvey/VOS}.
 Bovendien worden ook item- en unitnonresponsgraden berekend voor gebruik op de cijferpagina's. Deze worden weggeschreven naar\\
-\path{\\WV162699\fs_kb_dkb\svr\Beveiligde_data_VSA\999_Public_Use_Files\01_VOSdata\SVsurvey\respons_rates}
+\url{//WV162699/fs_kb_dkb/svr/Beveiligde_data_VSA/999_Public_Use_Files/01_VOSdata/SVsurvey/respons_rates}
 
 Wat kan beter?
 \begin{enumerate}
 \item De officiële statistieken zouden gedefinieerd kunnen worden als alle cumulatieve proporties over de antwoorschalen. punt. De cijferpagina's tonen dan slechts de cumulatieve proportie voor één categorie maar de cijferapplicatie toont ze voor alle categorieën. 
-\item De mapping naar variabelen naar analysevariabelen kan gebeuren via de mappings in de codelijsten in \path{03_deriveddata\01_codelists}. Het is waarschijnlijk niet nuttig om een aparte dataset aan te maken.
+\item De mapping naar variabelen naar analysevariabelen kan gebeuren via de mappings in de codelijsten in \url{03_deriveddata/01_codelists}. Het is waarschijnlijk niet nuttig om een aparte dataset aan te maken.
 \item de output tabellen met de VOS'en zijn nog niet gekoppeld aan het datamodel. De namen van de kolommen in de tabellen zijn ook nog te willekeurig, hoewel ik ze nu al wat consistenter heb gemaakt.
 \end{enumerate}
 
 Opgelet! De data in\\
-\path{\\WV162699\fs_kb_dkb\svr\Beveiligde_data_VSA\999_Public_Use_Files\01_VOSdata\SVsurvey\VOS}\\
+\url{//WV162699/fs_kb_dkb/svr/Beveiligde_data_VSA/999_Public_Use_Files/01_VOSdata/SVsurvey/VOS}\\
 is de bron van de PowerBI app, de variabelenamen zijn echter wel veranderd. Dus dit moet aangepast worden in PowerBI.
 
 
 
-\subsection{Creatie Public en Scientific Use Files}
+
 
 
 
@@ -405,29 +1525,149 @@ is de bron van de PowerBI app, de variabelenamen zijn echter wel veranderd. Dus 
 
 \section{Klaarzetten tabellen cijferpagina's}
 
-Als de VOS-data klaar staan, kan hieruit een extractie gebeuren om datasets aan te maken voor de cijferpagina's. Dit gebeurt via het programma
+Als de VOS-data klaar staan, kan hieruit een extractie gebeuren om datasets/tabellen aan te maken voor de cijferpagina's. Deze tabellen worden nadien rechtstreeks in DataWrapper ingeladen zonder dat er in principe nog iets manueel moet worden aangepast. Dit gebeurt via het programma\\
+\url{01_code/04_publish_tables_cijferpaginas/publish_tables_cijferpaginas.R}
+
+Dit leest automatisch de VOS-cijfers in uit de folder\\
+\url{//WV162699/fs_kb_dkb/svr/Beveiligde_data_VSA/999_Public_Use_Files/01_VOSdata/SVsurvey}
+
+Het script maakt tabellen aan via een beperkt aantal functies omdat er slechts een beperkt aantal templates zijn voor de grafieken. Een overzicht van alle tabellen/grafiekn staat in bestand\\
+\url{01_code/04_publish_tables_cijferpaginas/tables_cijferpagina.xlsx}\\
+Het script laadt dit bestand in en maakt alle grafieken aan die opgelijst staan in dit bestand. Het bestand bevat volgende kolommen:
+\begin{itemize}
+\item \verb+VOSn+: Het nummer van de VOS waartoe de grafiek behoort. Dit wordt gebruikt om de map te bepalen waar de tabel/grafiek in wordt weggeschreven.
+\item \verb+VOSlabel+: Het label van de VOS waartoe de grafiek behoort. Dit wordt gebruikt om de map te bepalen waar de tabel/grafiek in wordt weggeschreven.
+\item \verb+graphtype+: Het type/template van de grafiek. Voor elk type vind je in het script een functie om de grafiek aan te maken. Het script itereert dan over alle rijen met een bepaald grafiektype, en past er die functie op toe. De volgende grafiektypes zijn momenteel gedefinieerd:
+	\begin{itemize}
+	\item evolutionCI: De evolutie van cijfers over de tijd, met betrouwbaarheidsinterval. Bijvoorbeeld eerste grafiek bij \href{https://www.vlaanderen.be/statistiek-vlaanderen/sociale-samenhang/sociale-contacten}{cijferpagina Sociale Contacten}
+	\item backgroundCI: De cijfers voor de laatste editie, opgesplitst naar achtergrondkenmerken, met betrouwbaarheidsinterval. Bijvoorbeeld tweede grafiek bij \href{https://www.vlaanderen.be/statistiek-vlaanderen/sociale-samenhang/sociale-contacten}{cijferpagina Sociale Contacten}
+	\item lastobservationCI: De cijfers voor de laatste editie, alle items van een vraag in één tabel. Bijvoorbeeld tweede grafiek bij \href{https://www.vlaanderen.be/statistiek-vlaanderen/relatie-overheid-en-burger/politieke-participatie}{Politieke Participatie} 
+	\item evolutioncolumns: Evolutie van cijfers met tijdsdimensie in kolommen. Bijvoorbeeld eerste grafiek op \href{https://www.vlaanderen.be/statistiek-vlaanderen/relatie-overheid-en-burger/vertrouwen-in-instellingen}{Vertrouwen in instellingen}
+	\item lastobservationbycovarcolumns: De cijfers voor de laatste editie, opgesplitst naar achtergrondkenmerken, met achtergrondkenmerken in kolommen. Bijvoorbeeld tweede grafiek bij \href{https://www.vlaanderen.be/statistiek-vlaanderen/relatie-overheid-en-burger/vertrouwen-in-instellingen}{Vertrouwen in instellingen}
+	\item lastobservationcolumns: De cijfers voor de laatste editie, voor elke antwoordcategoie. Bijvoorbeeld tweede grafiek bij \href{https://www.vlaanderen.be/statistiek-vlaanderen/cultuur-en-vrije-tijd/cultuurparticipatie}{Cultuurparticipatie}
+	\item top10bar: De cijfers voor de laatste editie, van enkel top 10 van categorieën. Bijvoorbeeld derde grafiek bij \href{https://www.vlaanderen.be/statistiek-vlaanderen/sport/sportparticipatie}{Sportparticipatie}
+	\end{itemize}
+\item \verb+table+: naam die aan het bestand met tabel wordt gegeven.
+\item \verb+variables+: lijst van variabelen die worden toegevoegd aan de tabel, afgescheiden door punt-komma (``;''). De variabelenamen verwijzen naar de namen die worden aangemaakt in de analyse-dataset. Bijvoorbeeld eindigend op \verb+_dich+ om cumulatieve percentages te berekenen.
+\item \verb+covariate+: covariaat/achtergrondkenmerk waarlangs de tabel uitgesplitst moet worden. Dit kan steeds enkel maar één covariaat zijn.
+\item \verb+graphtype_description+: Een beschrijving van de grafiek gegeven door Pieter, deze kolom wordt niet gebruikt maar staat nog in het bestand voor de volledigheid.
+\end{itemize}
+Als er een nieuwe grafiek wordt verwacht volgens een bestaande template, dan hoef je enkel een rij toe te voegen aan bestand \url{tables_cijferpagina.xlsx}. Als de grafiek een nieuwe template volgt, moet dit uiteraard bij geprogrammeerd worden in het script.
+
+De tabellen (en sporadisch ook statische grafieken) worden weggeschreven naar de map\\
+\url{//WV162699/fs_kb_dkb/svr/Beveiligde_data_VSA/999_Public_Use_Files/02_CPdata}
 
 
-Deze tabellen worden weggeschreven in de map\\
-\path{\\WV162699\fs_kb_dkb\svr\Beveiligde_data_VSA\999_Public_Use_Files\02_CPdata}
+\paragraph{Wat kan beter?}
+
+De cijferpagina's worden door dit script steeds opnieuw aangemaakt voor alle VOS'en, ook voor diegenen die niet zijn bevraagd in de laatste editie van de SV-bevraging. Dit is uiteraard niet efficiënt. Dit script zou best omgezet worden naar een functie voor de editie-specifieke verwerking in map\\
+\url{//WV162699/fs_kb_dkb/svr/Beveiligde_data_VSA/021_SVbevraging/01_code/03_process_editions}\\
+waarbij enkel de tabellen van de VOS'en worden opgemaakt die in de bewuste editie werden bevraagd.  
+
+
+
+
+
+\section{Creatie handleiding en technische nota}
+
+De volgende stap is de aanmaak van de handleiding in de technische nota. Dit gebeurt met script\\
+\url{//WV162699/fs_kb_dkb/svr/Beveiligde_data_VSA/021_SVbevraging/01_code/05_Create_manual_and_technical_note/create_documentation.R}
+
+De handleiding en technische nota worden gecompileerd met \LaTeX. Hiervoor is het noodzakelijk dat een \LaTeX-distributie staat geïnstalleerd op jouw computer. Annelies en ik hebben MiKTeX, dat je kan vinden op deze website: \url{https://miktex.org/howto/install-miktex}. Dit programma staat niet in het bedrijfsportaal, je moet langs IT om het te installeren.
+
+De inhoud van de handleiding en technische nota worden gecreëerd vanuit het .tex-script\\
+\url{//WV162699/fs_kb_dkb/svr/Beveiligde_data_VSA/021_SVbevraging/01_code/05_Create_manual_and_technical_note/Input/Handleiding_SV-bevragingen.tex}\\
+Hierin kunnen tekstuele aanpassingen worden gemaakt. Het script bevat macro's om een onderscheid te maken tussen de delen die in de technische nota worden opgenomen en de delen die in de technische nota en de handleiding worden opgenomen. Daarnaast voegt het ook automatisch tabellen in met bijvoorbeeld een overzicht van de vragen of de responsgraden die automatisch worden klaargezet door het \verb+R+-script. Het \verb+R+-script compileert ook automatisch de \LaTeX-scripts.
+
+De handleiding en technische nota worden weggeschreven in folder\\
+\url{//WV162699/fs_kb_dkb/svr/Beveiligde_data_VSA/999_Public_Use_Files/04_microdata}
+
+\paragraph{Wat kan beter?}
+
+De inhoud van de technische nota en de handleiding zijn sterk overlappend. Hier moet nog verder worden afgesproken wat we precies publiceren voor de SV-bevragingen.
+
+
+
+
+
+\section{Creatie Public en Scientific Use Files}
+
+De laatste stap is de aanmaak van de public en scientific use files (PUF en SUF) van de microdata. Dit gebeurt via het script\\
+\url{//WV162699/fs_kb_dkb/svr/Beveiligde_data_VSA/021_SVbevraging/01_code/06_Publish_PUF_SUF/Publish_PUF_SUF.R}\\
+Dit script maakt gebruik van bestand\\
+\url{//WV162699/fs_kb_dkb/svr/Beveiligde_data_VSA/021_SVbevraging/01_code/06_Publish_PUF_SUF/Input/Variables_Use_files.xlsx}\\
+Dit bestand geeft een overzicht van alle variabelen die worden opgenomen in beide use files. Het bevat volgende kolommen:
+\begin{itemize}
+\item \verb+concept_id+: de naam van de variabele
+\item \verb+ScientificUseFile+: bevat een ``x'' voor elke variabele die wordt opgenomen in de Scientific Use File
+\item \verb+PublicUseFile+: bevat een ``x'' voor elke variabele die wordt opgenomen in de Public Use File
+\end{itemize}
+Het \verb+R+-script laadt automatisch \url{Variables_Use_files.xlsx} in, selecteert op basis van dit bestand de juiste variabelen, en schrijft de bestanden weg als \verb+.sav+-bestanden. Het voegt hierbij de goede variabel en vale labels toe zodat gebruikers een mooi opgekuist bestand krijgen. Als er variabelen bij mogen worden gevoegd (of verwijderd) in de use files, moet je dus enkel bestand \url{Variables_Use_files.xlsx} aanpassen en niet de scripts.
+
+De Scientific Use File wordt weggeschreven in\\
+\url{//WV162699/fs_kb_dkb/svr/Beveiligde_data_VSA/998_Scientific_Use_Files/021_SVbevraging}\\
+De Public Use File wordt weggeschreven in\\
+\url{//WV162699/fs_kb_dkb/svr/Beveiligde_data_VSA/999_Public_Use_Files/04_microdata}
+
+\paragraph{Wat kan beter?}
+
+Er wordt nu steeds één grote public en scientific use file aangemaakt waarin alle edities van de SV-bevraging zitten. Dit werd zo geïmplementeerd omdat collega's last hadden om zelf datasets aan elkaar te koppelen. Deze werkwijze is op de duur uiteraard niet houdbaar omdat het bestand steeds groter wordt. Het zou beter zijn om een PUF en SUF per editie te maken. Dit script zou dus best omgezet worden naar een functie voor de editie-specifieke verwerking in map\\
+\url{//WV162699/fs_kb_dkb/svr/Beveiligde_data_VSA/021_SVbevraging/01_code/03_process_editions}\\
+waarbij enkel de PUF en SUF van de bewuste editie wordt aangemaakt.  
+
+
+
+
 
 
 
 \section{Nieuwe vragen}
 
-Wat moet er gebeuren als er nieuwe vragen worden toegevoegd aan de SV-bevraging
+Wanneer er een nieuwe vraag wordt toegevoegd aan de SV-bevraging, moet je een reeks stappen doorlopen die het volledige verwerkingsproces omspannen: van datamodel tot publicatie. Doorloop deze stappen telkens in de aangegeven volgorde, want elke stap bouwt voort op de vorige.
 
 \begin{enumerate}
-\item codelijst aanmaken in het datamodel
-\item concept toevoegen aan dsd
-\item vraagverwoording toevoagen aan Questions.xlsx
-\item antwoordverwoording toevoegen aan Answers.xlsx
-\item variabele mee opnemen in cleaning, ze moet dus ook staan in het overzicht \path{SVXXXX_variables_survey.xlsx}
-\item Als er speciale bewerkingen tijdens de cleaning moeten worden uitgevoerd, moet dit opgenomen worden in \path{SVsurvey_clean_data.R}
-\item analyse van de variable moet worden toegevoegd aan de \path{SVsurvey_create_VOS.R}
-\item Voeg de variabele toe aan bestand \path{} voor PUF en SUF
-\item de aanmaak van een tabel voor DataWrapper moet worden toegevoegd 
+
+\item \textbf{Codelijst aanmaken in het datamodel.}
+Als de nieuwe vraag antwoordcategorieën heeft die nog niet bestaan in de huidige codelijsten, moet je een nieuwe codelijst aanmaken. Ga na of de antwoordcategorieën al (deels) voorkomen in bestaand bestand \url{01_code/01_data_model/01_code_lists/01_general_codelists/input/code_list_values.xlsx}. Voeg ontbrekende waarden toe aan dit bestand, en definieer de structuur van de nieuwe codelijst in \url{input/code_list_skeletons.xlsx}. Voer daarna script \url{create_code_lists.R} opnieuw uit zodat de nieuwe codelijst wordt weggeschreven naar \url{03_deriveddata/01_codelists}. Raadpleeg paragraaf \ref{sec:codelijsten} voor meer uitleg over de opbouw van codelijsten.
+
+\item \textbf{Concept toevoegen aan de DSD.}
+Voeg de nieuwe variabele toe als een nieuw concept in bestand \url{01_code/01_data_model/02_DSD/dsd_variables.xlsx}. Vul alle kolommen correct in: \verb+concept_id+, beschrijving, labels in de drie talen, het dataformaat, en indien van toepassing de verwijzing naar de zojuist aangemaakte codelijst. Voer vervolgens script \url{check_and_publish_dsd.R} uit. Dit script voert een reeks validatiechecks uit en schrijft de bijgewerkte DSD weg naar \url{03_deriveddata/02_DSD/dsd.xlsx}. Zorg ervoor dat er geen foutmeldingen optreden vooraleer je verdergaat.
+
+\item \textbf{Vraagverwoording toevoegen aan \url{Questions.xlsx}.}
+Voeg een rij toe aan bestand \url{01_code/03_process_editions/Metadata/Questions.xlsx} voor de nieuwe vraag. Koppel de vraagverwoording aan het juiste \verb+concept_id+ uit de DSD, en vul de kolommen \verb+question+, \verb+question_item+ en \verb+question_module+ correct in. Vergeet niet om de kolom \verb+from_surv_id+ in te vullen met de editie vanaf wanneer deze vraag wordt gesteld. Raadpleeg paragraaf \ref{sec:codebook} voor meer uitleg.
+
+\item \textbf{Antwoordverwoording toevoegen aan \url{Answers.xlsx}.}
+Voeg de antwoordverwoordingen toe aan bestand \url{01_code/03_process_editions/Metadata/Answers.xlsx}. Koppel elke antwoordverwoording aan de juiste \verb+value+ uit de codelijst, en vul ook hier de kolom \verb+from_surv_id+ in. Raadpleeg paragraaf \ref{sec:cleaning} voor meer uitleg.
+
+\item \textbf{Variabele opnemen in de cleaning.}
+Voeg de nieuwe variabele toe aan bestand\\
+\url{01_code/03_process_editions/SVXXXX/input/SVXXXX_variables_survey.xlsx}.\\
+Geef in kolom \verb+variable+ de naam op zoals het veldwerkbureau die aanlevert, en geef in kolom \verb+concept_id+ de gestandardiseerde naam op uit de DSD. Pas ook de verwerkingscode in\\
+\url{01_code/03_process_editions/SVXXXX/02_clean_data_SVXXXX.R}\\
+aan indien er manuele correcties nodig zijn vóór de structurele cleaning (bijvoorbeeld op basis van open tekstvakken). Raadpleeg paragraaf \ref{sec:cleaning} voor meer uitleg.
+
+\item \textbf{Speciale bewerkingen opnemen in de cleaningfunctie.}
+Als de nieuwe variabele specifieke bewerkingen vereist tijdens de geautomatiseerde cleaning --- zoals het berekenen van een afgeleide variabele, een specifieke hercodering, of een niet-standaard validatieregel --- dan moet dit worden opgenomen in de centrale cleaningfunctie \verb+SVsurvey_clean_data()+ in\\
+\url{01_code/00_functions/R}.\\
+Documenteer de nieuwe functionaliteit via Roxygen2 in de code zelf. Wees voorzichtig met wijzigingen in deze functie, want ze heeft een impact op alle edities.
+
+\item \textbf{Analyse toevoegen aan de VOS-aanmaak.}
+Voeg de nieuwe variabele toe aan bestand \url{01_code/03_process_editions/Metadata/Variables_for_VOS.xlsx}. Definieer hierbij de analysevariabele(n) die worden aangemaakt (bijvoorbeeld een gedichotomiseerde versie eindigend op \verb+_dich+ of een versie zonder niet-substantiële categorieën eindigend op \verb+_subst+), en geef aan welk type statistiek moet worden berekend via de kolom \verb+type+ (\verb+percentage+, \verb+multinom+ of \verb+mean+). Pas ook het script \url{01_code/03_process_editions/SVXXXX/03_create_VOS_SVXXXX.R} aan om de nieuwe analysevariabele aan te maken in de analysedataset. Raadpleeg paragraaf \ref{sec:VOS} voor meer uitleg.
+
+\item \textbf{Variabele toevoegen aan de PUF en SUF.}
+Voeg de nieuwe variabele toe aan bestand\\
+\url{01_code/06_Publish_PUF_SUF/Input/Variables_Use_files.xlsx}.\\
+Zet een ``x'' in de kolom \verb+ScientificUseFile+ en/of \verb+PublicUseFile+ naargelang de variabele al dan niet publiek vrijgegeven mag worden. Als er twijfel bestaat over de privacygevoeligheid van de variabele, overleg dan eerst met de data manager of DPO vooraleer je de variabele opneemt in de PUF.
+
+\item \textbf{Tabel voor DataWrapper toevoegen.}
+Voeg een of meerdere rijen toe aan bestand \url{01_code/04_publish_tables_cijferpaginas/tables_cijferpagina.xlsx} voor de grafieken die op de cijferpagina worden gepubliceerd. Kies een bestaand grafiektype uit kolom \verb+graphtype+ als de gewenste visualisatie al beschikbaar is als template. Als de nieuwe vraag een grafiektype vereist dat nog niet beschikbaar is, moet dit bijgeprogrammeerd worden als nieuwe functie in script \url{publish_tables_cijferpaginas.R}. Raadpleeg de beschikbare grafiektypes in paragraaf \ref{sec:cijferpaginas} voor een overzicht.
+
 \end{enumerate}
+
+
+
+
+
 
 
 
